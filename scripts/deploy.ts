@@ -1,0 +1,10 @@
+import {readFile} from 'node:fs/promises';
+import {spawnSync} from 'node:child_process';
+const values=Object.fromEntries((await readFile('.dev.vars','utf8')).trim().split('\n').map(line=>{const i=line.indexOf('=');return [line.slice(0,i),JSON.parse(line.slice(i+1))];}));
+const env={...process.env,WRANGLER_LOG_PATH:process.env.WRANGLER_LOG_PATH||'/private/tmp/music-worlds-deploy.log',WRANGLER_SEND_METRICS:'false'};
+const wrangler='node_modules/wrangler/bin/wrangler.js';
+const status=spawnSync('git',['status','--porcelain'],{encoding:'utf8'});if(status.stdout.trim())throw new Error('Commit the reviewed source before deploying.');
+const commit=spawnSync('git',['rev-parse','HEAD'],{encoding:'utf8'});if(commit.status)throw new Error('A source commit is required before deployment.');
+const deploy=spawnSync(process.execPath,[wrangler,'deploy','--env','','--var',`APP_COMMIT:${commit.stdout.trim()}`],{stdio:'inherit',env});if(deploy.status)process.exit(deploy.status||1);
+const secrets=spawnSync(process.execPath,[wrangler,'secret','bulk','--env',''],{input:JSON.stringify(values),encoding:'utf8',env});
+if(secrets.status){console.error('Secret upload failed. No secret values printed.');process.exit(1);}console.log('Worker deployment and secret upload completed.');

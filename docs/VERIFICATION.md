@@ -1,0 +1,11 @@
+# Prüfung
+
+Stand 04.11.2026. Unit-Tests: 19 erfolgreich. Typprüfung, ESLint und Produktions-Build erfolgreich. Vollständiger npm-Audit nach gezielten Transitiv-Updates: 0 bekannte Schwachstellen. Keine Audit-Ausnahmen. Client-Bundle ca.40 KiB minifiziert.
+
+Echte isolierte PostgreSQL-Integration: 65 Assertions erfolgreich, Migration zweimal angewandt/Idempotenz geprüft. Zwei Identitäten und konkurrierende Antworten: ein Gewinner des atomaren Versionsvergleichs, ein 409, danach erneute Antwort und gemeinsame Auflösung. Ergebnis nur einmal gespeichert. Fremde Mitgliedschaft, fremde Bearbeitung, fehlendes Adminrecht, CSRF, Rechte-Checkbox ohne Nachweis, `rights_unverified`, Beitragsdublette, parallele Edits mit genau einem Audit-Ereignis, Meldung, Rückzug und Profillöschung geprüft. Keine Produktionsdaten als Testziel verwendet.
+
+Browserabnahme mit zwei getrennten Cookie-Origins in derselben lokalen QA: Raumbeitritt, Einstellungen, gleichzeitige Spielansicht, verdeckte Lösung nach erster Antwort, Neuladen des zweiten Clients, gemeinsame Auflösung, +1 pro Person, Ergebnis und gespeicherte Profilstatistik erfolgreich. Katalogsuche nach Queen findet Titel/Künstler. 390×844-Viewport: Navigation, Profilstatistik, Theme-Wechsel und einspaltiges Layout geprüft; kein horizontaler Überlauf. Beitragserstellung, Bearbeitung und Rückzug wurden im Browser mit selbst erstelltem Testinhalt erfolgreich geprüft. Ein echter Solo-Produktivdurchlauf prüfte Sitzung, Lobby, Antwort, Auflösung, Punkte und persistente Statistik; seine eigene Testidentität und sein Raum wurden anschließend entfernt.
+
+YouTube: URL-/Zeitvalidierung und Spoofingfälle unitgetestet; offizieller IFrame-API-Adapter behandelt Fehlercodes und behält Quellenfallback. Kein fremdes Video/Audio als Testfixture gespeichert. Echte regionale Sperren sind anbieter-/standortabhängig und nicht vollständig reproduzierbar. Uploadadapter mit eigenen Byte-Fixtures getestet; öffentliche Audioauslieferung absichtlich deaktiviert. SSO konnte mangels produktivem IdP nicht end-to-end geprüft werden und bleibt deaktiviert.
+
+Produktiver Smoke prüft Homepage, Informationsseiten, Canonicals/JSON-LD, Sitemap/Robots, Assets, Health, realen Datenbankkatalog, 401/no-store für private Profile und fremden Origin (403). Deployment-ID und finales Ergebnis nach Bereitstellung in PROGRESS.md.

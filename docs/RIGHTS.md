@@ -1,0 +1,29 @@
+# Rechte und externe Quellen
+
+Prüfstand 04.11.2026. Technische Schutzmaßnahmen sind keine pauschale rechtliche Erlaubnis. Betreiberstaat, Nutzerstaaten und konkrete Lizenzen sind vor einer breiteren Freigabe zu bestimmen. Es existiert keine allgemeine 60-Sekunden-Freigrenze. Das Zitierrecht ist zweckgebunden und wird nicht als Standardfreigabe für Musikrätsel verwendet.
+
+## Offizielle Grundlagen
+
+- [UrhG §19a](https://www.gesetze-im-internet.de/urhg/__19a.html): öffentliches Zugänglichmachen; [§51](https://www.gesetze-im-internet.de/urhg/__51.html): Zitatvoraussetzungen; [Gesetz mit §§64–66](https://www.gesetze-im-internet.de/urhg/BJNR012730965.html): Schutzfristen. Die gewöhnliche Werkfrist erfasst keine neuen Aufnahmen, Bearbeitungen oder modernen Übersetzungen pauschal mit.
+- [YouTube Developer Policies](https://developers.google.com/youtube/terms/developer-policies), [Playerparameter](https://developers.google.com/youtube/player_parameters), [IFrame API](https://developers.google.com/youtube/iframe_api_reference). Sichtbarer offizieller Player, vollständige Steuerelemente, Start/Ende als unterstützte Sekundenparameter. Keine Downloads, Extraktion, Titelüberdeckung, Audiotrennung, Werbe- oder Zugriffsumgehung. Mindestens 200×200 Pixel; Player hier mindestens 210 Pixel hoch. Fehler 2/5/100/101/150/153 und externe Fallbacklinks sind vorgesehen. Regionale Verfügbarkeit bleibt Anbieterentscheidung.
+- [MusicBrainz Datenlizenzen](https://musicbrainz.org/doc/About/Data_License): Kerndaten CC0, ergänzende Daten CC BY-NC-SA 3.0. Kein pauschaler CC0-Import von Ergänzungsdaten, Rezensionen, Coverbildern oder Texten. [API-Regeln](https://musicbrainz.org/doc/MusicBrainz_API): aussagekräftiger User-Agent und höchstens eine Anfrage/Sekunde; für einen späteren Import globales Queueing/Cache und konkreten Nutzungsumfang prüfen. Aktuell kein API-Aufruf nötig: manuelle Metadaten und Links funktionieren vollständig.
+- [Wikidata-Lizenzierung](https://www.wikidata.org/wiki/Wikidata:Licensing): strukturierte Daten CC0; andere Namensräume getrennt. Als zweite Metadatenquelle geeignet, derzeit keine zusätzliche API/Abhängigkeit. Moderne Cover/Streams nicht daraus ableiten.
+
+## Technische Freigabe
+
+Jeder Beitrag besitzt eine Rechtebasis (`external_embed`, `external_link`, `original_content`, `licensed_content`, `public_domain`, `rights_unverified`), Rechteinhaber, Rechtequelle, Lizenz, erlaubte Nutzungen, optionales Ablaufdatum und privaten Nachweistext. Eine Version wird erst nach serverseitig protokollierter Moderationsentscheidung öffentlich. Moderatoridentität, Begründung, Nachweisprüfung und Zeitpunkt sind Pflicht. Abgelaufene oder ungeklärte Rechte sperren die Veröffentlichung. Jede Bearbeitung setzt die Freigabe zurück. Externe Videos brauchen eine zusätzliche Medienprüfung. Medienberechtigung und Recht am eigenen Hinweis sind getrennte Entscheidungen.
+
+Die Selbstbestätigung eines Beitragenden allein reicht niemals. Auch `original_content` verlangt Prüfung der plausiblen Urheberschaft/Entstehung; Lizenztexte sind im Nachweis nachvollziehbar zu benennen. Originalhinweise dürfen keine verdeckten Kopien sein. Lizenzierte Textausschnitte sind im Datenmodell/API unterstützt; Rechteumfang und Gültigkeit werden serverseitig geprüft. Öffentliche Audiofreigabe bleibt ausdrücklich ausgeschaltet.
+
+Private Speicheradapter: Audio bis 2 MiB WAV, Nachweise bis 1 MiB PDF, Bilder bis 1 MiB PNG, Dateisignatur-/Größenkontrolle, Eigentümer-/Admingate, ausschließlich Download mit no-store und nosniff. R2 ist nicht gebunden; produktive Uploadaufrufe liefern 503. Kein öffentliches Bucket oder offenes Abspiel-Endpoint. Vor Aktivierung: Rechtebelege an konkrete Asset-Hashes und Beitragsrevisionen binden, vollständige WAV-/Dauerprüfung, Malwareprüfung für Nachweise, Speicherlebenszyklus und autorisierte Wiedergabe samt Browserabnahme ergänzen. Die Schnittstelle allein gilt nicht als Produktionsfreigabe für Audio.
+
+Meldungen, Sperren und Zurückziehen sind serverseitig geschützt. Entzogene Freigaben entfernen Beiträge aus Katalog und Pool; betroffene gespeicherte Runden werden vor dem nächsten Zugriff in die Lobby zurückgesetzt. Bei Profil-Löschung werden eigene Belege und Texte gelöscht und betroffene Raumkopien entfernt. Geprüfte Backups/Archive sind separat zugriffsbeschränkt und müssen bei einer Löschanfrage ebenfalls berücksichtigt werden.
+
+## Historische Übernahme
+
+Vier englische Fragen übernommen, jeweils ausschließlich historische Originalworte:
+
+- Amazing Grace: [Morgan-Ausstellung](https://www.themorgan.org/exhibitions/online/TheDiary/John-Newton) belegt Newton 1725–1807 und Olney Hymns 1779. [Library of Congress](https://www.loc.gov/collections/amazing-grace/articles-and-essays/creation-of-amazing-grace/) und [Wikisource-Edition 1840](https://en.wikisource.org/wiki/Amazing_Grace) bestätigen Ursprung/Wortlaut. Keine moderne Aufnahme oder Bearbeitung übernommen.
+- The Star / Twinkle, Twinkle, Little Star: [Morgan-Katalog 85839](https://www.themorgan.org/music-manuscripts-and-printed-music/85839) belegt Erstdruck 1806 und Jane Taylor 1783–1824; Ann Taylor 1782–1866. [Historischer Wortlaut](https://en.wikisource.org/wiki/Rhymes_for_the_Nursery/The_Star) verglichen. Gewöhnliche Werkfristen längst abgelaufen; keine moderne Übersetzung/Vertonung übernommen.
+
+Vier französische Fragen privat erhalten: [Frère Jacques](https://fr.wikisource.org/wiki/Fr%C3%A8re_Jacques_(texte)), [Au clair de la lune](https://fr.wikisource.org/wiki/Chansons_populaires_enfantines/Au_clair_de_la_lune). Commons kennzeichnet die zugrunde liegenden Scans als gemeinfrei, nennt aber kein Erscheinungsdatum. Die Kennzeichnung wird nicht als alleiniger Nachweis behandelt; `rights_unverified`, keine öffentliche Auslieferung. Für Freigabe datierte historische Edition und belastbare Schutzfristbegründung dokumentieren.

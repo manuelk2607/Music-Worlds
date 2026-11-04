@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.wrangler/
+.dev.vars*
+.env*
+!.env.example
+public/app.js
+coverage/
+private/
+*.log
+
+/private

@@ -1,0 +1,40 @@
+{
+  "name": "music-worlds",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1",
+    "build": "esbuild src/client.ts --bundle --minify --format=esm --outfile=public/app.js && wrangler deploy --env='' --dry-run --outdir dist",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/*.test.ts",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "deploy": "npm run build && wrangler deploy --env=''",
+    "test:integration": "tsx scripts/integration.ts",
+    "lint": "eslint .",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "1.2.0",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261019.1",
+    "@types/node": "22.19.19",
+    "@typescript-eslint/parser": "8.72.1",
+    "esbuild": "0.25.12",
+    "eslint": "10.14.0",
+    "jiti": "2.6.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "wrangler": "4.151.2"
+  },
+  "overrides": {
+    "undici": "7.30.1",
+    "minimatch": "11.0.1"
+  }
+}

@@ -1,0 +1,9 @@
+# Worlds Hub
+
+GitHub-PROGRESS von manuelk2607/Worlds-Hub und vorhandenes Auth-Paket am 04.11.2026 geprüft. Die gewünschte Hub-Origin liefert für `/.well-known/openid-configuration` 404. Der zentrale Neon-Pilot ist angelegt, aber OIDC-Clientregistrierung, echte Cross-App-Abnahme und frische Reauth für sicheres Linking sind noch offen. Daher kein produktives SSO integriert und keine neue zentrale Benutzerverwaltung aufgebaut.
+
+Music-Worlds hat nur lokale Gastprofile und Spiel-/Beitragsdaten. `src/identity.ts` beschreibt die Adaptergrenze, `profiles.hub_subject` ist eine reservierte eindeutige Zuordnung, `HUB_AUTH_ENABLED=false` bleibt wirksam. Ein Flag allein schaltet keine ungetestete Anmeldung frei. Keine geteilten Cookies, URL-Tokens, Mail-/Namenszusammenführung oder Synchronisierung fremder Rollen.
+
+Nach Freigabe dasselbe versionierte Hub-Auth-Paket verwenden: Authorization Code + PKCE, exakte Redirect-URI, einmalige serverseitige State/Nonce, JWS/Issuer/Audience/Userinfo-Prüfung und widerrufbare lokale Sessions. Lokale Profile behalten ihre UUID; zentrale Identität ist eine zusätzliche Issuer/Subject-Zuordnung. Ein vorhandenes Gastprofil nur mit aktiver Gastsession, frischem zentralem Nachweis und expliziter Zustimmung atomar verknüpfen. Keine historischen Eigentümerzuordnungen aus Anzeigenamen ableiten.
+
+Vor Aktivierung echte Tests für zwei Konten, unterschiedliche Issuer bei gleichem Subject, CSRF, Tokenreplay, Linkingkonflikt, Sitzungsfixierung, Sessionwiderruf und Hubausfall. Lokales Logout muss die lokale Sitzung widerrufen. Globales Logout nur mit nachgewiesenem Anbieterprotokoll; aktive lokale Sitzungen dürfen bei einem vorübergehenden Hubausfall im geprüften Gültigkeitsfenster weiter funktionieren. Kein Silent-Fallback von fehlgeschlagenem SSO auf eine andere Person.

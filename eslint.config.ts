@@ -1,0 +1,2 @@
+import parser from '@typescript-eslint/parser';
+export default [{ignores:['dist/**','public/app.js','node_modules/**','private/**']},{files:['**/*.ts'],languageOptions:{parser,ecmaVersion:'latest',sourceType:'module'},rules:{'no-eval':'error','no-implied-eval':'error','no-unreachable':'error','no-unsafe-finally':'error','valid-typeof':'error','no-constant-condition':'error','no-duplicate-case':'error','no-dupe-args':'error','no-sparse-arrays':'error','no-async-promise-executor':'error','no-promise-executor-return':'error'}}];

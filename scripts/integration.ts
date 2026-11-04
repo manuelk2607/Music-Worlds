@@ -1,0 +1,96 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {neon} from '@neondatabase/serverless';
+import worker,{type Env} from '../src/worker';
+import {seedContributions} from '../src/seed-data';
+import {migrate} from './migrate';
+import {seed} from './seed';
+// Uses only an explicitly isolated target; never production. The local connections file is gitignored.
+const connection=process.env.TEST_DATABASE_URL||JSON.parse(await readFile('private/connections.json','utf8')).qa;
+assert.ok(connection,'TEST_DATABASE_URL is required');
+if(process.env.TEST_DATABASE_URL&&!process.env.CONFIRM_ISOLATED_TEST_DATABASE)throw new Error('Set CONFIRM_ISOLATED_TEST_DATABASE=1 for an explicitly isolated test database.');
+const direct=new URL(connection);direct.hostname=direct.hostname.replace('-pooler','');await migrate(direct.href);await migrate(direct.href);await seed(connection);
+const sql=neon(connection),origin='https://music-worlds.test';
+const env:Env={DATABASE_URL:connection,SESSION_PEPPER:'test-only-'+crypto.randomUUID(),ADMIN_TOKEN:'test-only-admin-token-with-at-least-32-characters',SITE_ORIGIN:origin,HUB_ORIGIN:'https://hub.test',HUB_AUTH_ENABLED:'false',ASSETS:{fetch:async()=>new Response(await readFile('public/index.html','utf8'),{headers:{'Content-Type':'text/html'}})}};
+let checks=0;
+type Client={cookie:string;id:string};
+async function request(c:Client|null,path:string,method='GET',data?:unknown,admin=false,foreign=false){
+  const headers:Record<string,string>={Origin:foreign?'https://attacker.test':origin,'CF-Connecting-IP':'192.0.2.'+(c?c.id.charCodeAt(0):'1'),...(c?{Cookie:c.cookie}:{}),...(data?{'Content-Type':'application/json'}:{}),...(admin?{Authorization:'Bearer '+env.ADMIN_TOKEN}:{})};
+  const r=await worker.fetch(new Request(origin+'/api'+path,{method,headers,body:data?JSON.stringify(data):undefined}),env);
+  const value=await r.json() as any;return {status:r.status,body:value,cookie:r.headers.get('Set-Cookie')?.split(';')[0]||''};
+}
+const eq=(actual:unknown,expected:unknown)=>{assert.deepEqual(actual,expected);checks++;};
+async function newClient(name:string){const r=await request(null,'/session','POST',{name,theme:'dark'});eq(r.status,201);return {cookie:r.cookie,id:r.body.id};}
+let a:Client,b:Client,c:Client;
+try{
+  a=await newClient('Integration A');b=await newClient('Integration B');c=await newClient('Integration C');
+  eq((await request(a,'/me')).body.id,a.id);eq((await request(null,'/me')).status,401);
+  const sameSession=await request(a,'/session','POST',{name:'Must not replace an existing profile',theme:'dark'});eq(sameSession.status,200);eq(sameSession.body.id,a.id);
+  eq((await request(a,'/rooms','POST',{},false,true)).status,403);
+  let r=await request(a,'/rooms','POST',{});eq(r.status,201);let room=r.body;const code=room.code;
+  eq((await request(b,'/rooms/'+code)).status,403);eq((await request(b,'/rooms/'+code+'/join','POST',{})).status,200);
+  room=(await request(a,'/rooms/'+code)).body;
+  const action=(client:Client,action:string,extra:any={})=>request(client,'/rooms/'+code+'/action','POST',{version:room.version,match:room.match,round:room.roundIndex,action,...extra});
+  eq((await action(b,'settings',{settings:{rounds:1,seconds:15,answerType:'choice',category:'mixed'}})).status,403);
+  room=(await action(a,'settings',{settings:{rounds:1,seconds:15,answerType:'choice',category:'mixed'}})).body;
+  room=(await action(a,'start')).body;eq(room.phase,'voting');eq(room.round.solution,null);assert.ok(!JSON.stringify(room).includes('correctId'));checks++;
+  eq((await request(c,'/rooms/'+code+'/join','POST',{})).status,409);
+  const before=room.version,answer=room.round.choices[0].id;
+  const parallel=await Promise.all([action(a,'answer',{answer}),action(b,'answer',{answer})]);
+  eq(parallel.map(x=>x.status).sort(),[200,409]);
+  room=(await request(a,'/rooms/'+code)).body;eq(room.version,before+1);
+  const loser=parallel[0].status===409?a:b;room=(await action(loser,'answer',{answer})).body;eq(room.phase,'reveal');
+  eq((await action(a,'answer',{answer})).status,409);
+  eq((await request(b,'/rooms/'+code)).body.round.solution,room.round.solution);
+  room=(await action(a,'next')).body;eq(room.phase,'finished');
+  eq((await request(a,'/me')).body.stats.games,1);await request(a,'/rooms/'+code);eq((await request(a,'/me')).body.stats.games,1);
+  room=(await action(a,'rematch')).body;eq(room.phase,'lobby');
+  room=(await action(a,'leave')).body;room=(await request(b,'/rooms/'+code)).body;eq(room.host,b.id);
+  eq((await request(c,'/rooms/'+code+'/join','POST',{})).status,200);
+  await sql`UPDATE room_presence SET last_seen_at=now()-interval '3 minutes' WHERE room_code=${code} AND profile_id=${b.id}`;
+  room=(await request(c,'/rooms/'+code)).body;eq(room.host,c.id);eq((await request(b,'/rooms/'+code)).status,403);
+  const input=structuredClone(seedContributions[0]);input.song.title='Original Integration '+crypto.randomUUID();input.prompt='Dieser vollständig neue, selbst geschriebene Testhinweis '+crypto.randomUUID();
+  r=await request(a,'/contributions','POST',input);eq(r.status,201);const contributionId=r.body.id;
+  eq((await request(a,'/contributions','POST',input)).status,409);
+  eq((await request(b,'/contributions/'+contributionId,'PATCH',{revision:1,body:input})).status,404);
+  eq((await request(a,'/admin')).status,403);
+  const review={id:contributionId,revision:1,status:'approved',reason:'Private original test hint reviewed for rights and accuracy.',evidenceChecked:false};
+  eq((await request(a,'/admin/review','POST',review,true)).status,400);
+  const race=await Promise.all([request(a,'/contributions/'+contributionId,'PATCH',{revision:1,body:input}),request(a,'/contributions/'+contributionId,'PATCH',{revision:1,body:input})]);eq(race.map(x=>x.status).sort(),[200,409]);
+  const events=await sql`SELECT COUNT(*)::int n FROM contribution_events WHERE contribution_id=${contributionId}`;eq(events[0].n,2);
+  eq((await request(a,'/admin/review','POST',{...review,revision:2,evidenceChecked:true},true)).status,200);
+  eq((await sql`SELECT year FROM songs WHERE title=${input.song.title}`)[0].year,input.song.year);
+  let pub=(await request(b,'/public-contributions')).body.contributions;eq(pub.some((x:any)=>x.id===contributionId),true);assert.ok(!JSON.stringify(pub).includes(input.rights.evidence));checks++;
+  const corrected={...input,song:{...input.song,year:2001,album:'Original corrected test album'}};
+  eq((await request(a,'/contributions/'+contributionId,'PATCH',{revision:3,body:corrected})).status,200);
+  eq((await request(a,'/admin/review','POST',{...review,revision:4,evidenceChecked:true},true)).status,200);
+  eq((await sql`SELECT year FROM songs WHERE title=${input.song.title}`)[0].year,2001);
+  eq((await sql`SELECT count(*)::int n FROM songs WHERE title=${input.song.title}`)[0].n,1);
+  eq((await request(b,'/report','POST',{id:contributionId,reason:'A test report on an original clue.'})).status,201);
+  eq((await request(a,'/contributions/'+contributionId,'DELETE',{revision:5})).status,200);
+  pub=(await request(b,'/public-contributions')).body.contributions;eq(pub.some((x:any)=>x.id===contributionId),false);
+  const lyrics=structuredClone(input);lyrics.kind='lyrics';lyrics.prompt='Original test text generated by this integration test, not a song lyric.';lyrics.rights.basis='rights_unverified';
+  const protectedId=(await request(a,'/contributions','POST',lyrics)).body.id;
+  eq((await request(a,'/admin/review','POST',{...review,id:protectedId,evidenceChecked:true},true)).status,400);
+  eq((await request(a,'/media','POST',{})).status,503);
+  const objects=new Map<string,ArrayBuffer>();
+  env.MEDIA={put:async(key,data)=>{objects.set(key,data);},get:async key=>objects.has(key)?{arrayBuffer:async()=>objects.get(key)!}:null,delete:async key=>{objects.delete(key);}};
+  const upload=await worker.fetch(new Request(origin+'/api/media?purpose=evidence',{method:'POST',headers:{Origin:origin,Cookie:c.cookie,'Content-Type':'application/pdf'},body:'%PDF-1.7\nOriginal test rights evidence'}),env);
+  eq(upload.status,201);const asset=await upload.json() as any;eq(asset.publicationEnabled,false);
+  eq((await request(b,'/media/'+asset.id)).status,403);
+  const privateFile=await worker.fetch(new Request(origin+'/api/media/'+asset.id,{headers:{Cookie:c.cookie}}),env);
+  eq(privateFile.status,200);assert.match(privateFile.headers.get('Content-Disposition')||'',/^attachment/);checks++;
+  const unsafe=await worker.fetch(new Request(origin+'/api/media?purpose=evidence',{method:'POST',headers:{Origin:origin,Cookie:c.cookie,'Content-Type':'text/html'},body:'<script>not a PDF</script>'}),env);eq(unsafe.status,415);
+  const seo=await worker.fetch(new Request(origin+'/spiele'),env);eq(seo.status,200);assert.match(await seo.text(),/rel="canonical"/);checks++;
+  eq((await request(c,'/me','DELETE',{confirm:'DELETE'})).status,200);eq((await request(c,'/me')).status,401);
+  eq(objects.size,0);
+  const left=await sql`SELECT count(*)::int n FROM profiles WHERE id=${c.id}`;eq(left[0].n,0);
+  eq((await request(a,'/me','DELETE',{confirm:'DELETE'})).status,200);
+  const adminAfterDeletion=(await request(b,'/admin','GET',undefined,true)).body;
+  eq(adminAfterDeletion.reports.some((report:any)=>report.contribution_id===contributionId),false);
+  eq(adminAfterDeletion.contributions.every((entry:any)=>!!entry.body.song?.title),true);
+  eq((await sql`SELECT count(*)::int n FROM songs WHERE title=${input.song.title}`)[0].n,0);
+  console.log(`${checks} integration assertions passed: real isolated PostgreSQL, concurrent votes/edits, moderation, rights, reports, deletion, reload and SEO.`);
+}finally{
+  for(const client of [a!,b!,c!].filter(Boolean)){try{await request(client,'/me','DELETE',{confirm:'DELETE'});}catch{}}
+}
