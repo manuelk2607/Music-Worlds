@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { contributionSchema,canPublish,youtube,safeURL,publicContribution, type Review } from '../src/domain';
+import { contributionSchema,canPublish,youtube,safeURL, type Review } from '../src/domain';
 import { seedContributions } from '../src/seed-data';
 const review:Review={status:'approved',reviewer:'moderator',reason:'Original hint reviewed individually',evidenceChecked:true,reviewedAt:new Date().toISOString()};
 test('all starter clues are valid, newly authored content with four distinct song titles',()=>{
@@ -31,6 +31,8 @@ test('duplicate answers and valid aliases as distractors are refused',()=>{
   const c=structuredClone(seedContributions[0]);c.alternatives[0]='  BOHEMIAN   RHAPSODY ';assert.equal(contributionSchema.safeParse(c).success,false);
   c.alternatives[0]='Different';c.aliases=['Different'];assert.equal(contributionSchema.safeParse(c).success,false);
 });
-test('public projections exclude private proof and alternate accepted answers',()=>{
-  const p=publicContribution(seedContributions[0]);assert.ok(!('evidence' in p.rights));assert.ok(!('alternatives' in p));assert.ok(!('aliases' in p));
+test('an external medium needs a separate review as well as the original hint review',()=>{
+  const c=structuredClone(seedContributions[0]);c.media={provider:'youtube',url:'https://youtu.be/abcdefghijk',official:true,start:0};
+  assert.equal(canPublish(c,review),false);assert.equal(canPublish(c,{...review,mediaChecked:true}),true);
+  c.media.official=false;assert.equal(canPublish(c,{...review,mediaChecked:true}),false);
 });

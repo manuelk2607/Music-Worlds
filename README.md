@@ -8,7 +8,7 @@ Vier Bereiche: **Spielen**, **Entdecken**, **Beitragen**, **Profil**. Ein konkre
 
 TypeScript-Worker mit Static Assets, kleiner Browserclient ohne Frameworklaufzeit und eigener Neon-PostgreSQL-Datenbank. Sprachwelten-Konzepte und der lokal vorbereitete portable Quizkern wurden gezielt adaptiert; keine laufende Abhängigkeit von Sprachwelten oder Hub. SQL ist parametrisiert. Räume verwenden atomare Versionsvergleiche; Ergebnisse werden nur beim erfolgreichen Abschluss einmal gespeichert. Anwesenheit liegt getrennt vom Spielzustand. Private Rechtebelege gelangen nicht in öffentliche Projektionen.
 
-`src/core/` enthält Mechanik, `src/domain.ts` Beitrag/Rechtevalidierung, `src/urls.ts` Medien-URLs, `src/media.ts` private Speicherverträge, `src/worker.ts` HTTP/Persistenz, `src/client.ts` UI. Migrationen unter `migrations/`, reproduzierbare Tests unter `tests/` und `scripts/`.
+`src/core/` enthält Mechanik, `src/domain.ts` Beitrag/Rechtevalidierung, `src/urls.ts` Medien-URLs, `src/media-providers.ts` Anbieter- und spätere autorisierte Wiedergabeverträge, `src/media.ts` private Speicherverträge, `src/worker.ts` HTTP/Persistenz, `src/client.ts` UI. Migrationen unter `migrations/`, reproduzierbare Tests unter `tests/` und `scripts/`.
 
 ## Entwickeln und prüfen
 

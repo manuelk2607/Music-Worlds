@@ -77,7 +77,7 @@ export function view(r:Room,id:string,now=Date.now()){
     roundIndex:r.roundIndex,serverTime:now,history:r.history,remaining:r.settings.rounds-r.roundIndex-1,
     round:round&&c?{prompt:c.prompt,kind:c.kind,choices:r.settings.answerType==='choice'?round.choices:[],deadline:round.deadline,
       answered:Object.keys(round.answers),myAnswer:round.answers[id],help:musicHelp(portable(round.task),2),
-      solution:shown?{title:c.song.title,artists:c.song.artists,source:c.song.source,correctId:round.correctId}:null,
+      solution:shown?{contributionId:round.task.id,title:c.song.title,artists:c.song.artists,source:c.song.source,correctId:round.correctId}:null,
       // External player titles can reveal answers: media is offered only after the answer phase.
       media:shown?c.media:null}:null};
 }

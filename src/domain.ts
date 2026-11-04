@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {normalizeExternalMedia} from './media-providers';
 
 export class AppError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -10,7 +11,7 @@ export const normalized = (s: string) => s.normalize('NFKC').trim().replace(/\s+
 const text = (max: number) => z.string().trim().min(1).max(max);
 export const rightsBases = ['external_embed','external_link','original_content','licensed_content','public_domain','rights_unverified'] as const;
 export {safeURL,youtube} from './urls';
-import {safeURL,youtube} from './urls';
+import {safeURL} from './urls';
 const url = z.string().max(1500).transform((s, ctx) => {
   try { return safeURL(s); } catch { ctx.addIssue({code:'custom',message:'Ungültiger öffentlicher HTTPS-Link'}); return z.NEVER; }
 });
@@ -24,7 +25,7 @@ export const contributionSchema = z.object({
   rights:z.object({basis:z.enum(rightsBases),holder:text(200),license:z.string().trim().max(300).default(''),
     source:url, evidence:z.string().trim().max(3000).default(''), uses:z.array(z.enum(['display','stream','embed','link'])).max(4),
     expires:z.iso.datetime().optional()}),
-  media:z.object({url, start:z.number().int().min(0).max(86400).default(0),end:z.number().int().max(86400).optional(),official:z.boolean()}).optional(),
+  media:z.object({provider:z.enum(['youtube','external_link']).default('youtube'),url, start:z.number().int().min(0).max(86400).default(0),end:z.number().int().max(86400).optional(),official:z.boolean()}).optional(),
   gameConfig:z.object({mode:z.literal('guess-song').default('guess-song')}).default({mode:'guess-song'})
 }).strict().superRefine((v,c) => {
   const answers=[v.song.title,...v.alternatives].map(normalized);
@@ -32,7 +33,7 @@ export const contributionSchema = z.object({
     c.addIssue({code:'custom',message:'Vier unterschiedliche Titel erforderlich; Alternativen dürfen keine gültigen Aliase sein.'});
   if(v.kind==='original_hint' && v.rights.basis!=='original_content')
     c.addIssue({code:'custom',message:'Selbst formulierte Hinweise benötigen die Rechtebasis Eigener Inhalt.'});
-  if(v.media) { try { youtube(v.media.url,v.media.start,v.media.end); } catch(e) { c.addIssue({code:'custom',message:(e as Error).message}); } }
+  if(v.media) { try { normalizeExternalMedia(v.media); } catch(e) { c.addIssue({code:'custom',message:(e as Error).message}); } }
 });
 export type Contribution = z.infer<typeof contributionSchema>;
 export type Review = {status:'pending'|'approved'|'blocked'|'withdrawn'; reviewer?:string; reason?:string; evidenceChecked?:boolean; mediaChecked?:boolean; reviewedAt?:string;operationId?:string};
@@ -49,8 +50,3 @@ export function canPublish(c:Contribution, review:Review, now=Date.now()) {
 }
 export const profileSchema=z.object({name:text(40),theme:z.enum(['dark','light']).default('dark')}).strict();
 export type Task = {id:string; contribution:Contribution;revision?:number};
-export function publicContribution(c:Contribution) {
-  return {song:c.song,kind:c.kind,prompt:c.prompt,hint:c.hint,difficulty:c.difficulty,category:c.category,
-    media:c.media?youtube(c.media.url,c.media.start,c.media.end):undefined,
-    rights:{basis:c.rights.basis,holder:c.rights.holder,license:c.rights.license,source:c.rights.source}};
-}

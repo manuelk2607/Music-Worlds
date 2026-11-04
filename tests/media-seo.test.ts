@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {validateUpload,mediaProviders} from '../src/media';import {seoHTML,publicPages,indexablePage} from '../src/seo';
+import {normalizeExternalMedia,externalMediaProviders} from '../src/media-providers';
 test('private upload adapter accepts bounded original fixtures and rejects unsafe formats',()=>{
   const wav=new TextEncoder().encode('RIFF0000WAVEoriginal fixture');assert.equal(validateUpload(wav,'audio/wav','audio').purpose,'audio');
   const pdf=new TextEncoder().encode('%PDF-1.7\nOriginal test evidence');assert.ok(validateUpload(pdf,'application/pdf','evidence'));
@@ -15,4 +16,9 @@ test('the owner-requested index policy permits only the landing page',()=>{
   const template='<meta name="robots" content="noindex"></head>';
   assert.match(seoHTML(template,'/','https://music.test',true),/content="index,follow"/);
   assert.match(seoHTML(template,'/ueber','https://music.test',true),/content="noindex,nofollow"/);
+});
+test('provider adapters normalize both visible embeds and pure external links without changing game mechanics',()=>{
+  const embed=normalizeExternalMedia({url:'https://youtu.be/abcdefghijk',start:2,end:8});assert.equal(embed.provider,'youtube');assert.ok('embed' in embed&&embed.embed.includes('end=8'));
+  const link=normalizeExternalMedia({provider:'external_link',url:'https://example.org/official-song'});assert.deepEqual(link,{provider:'external_link',url:'https://example.org/official-song'});assert.ok(!('embed' in link));
+  assert.throws(()=>normalizeExternalMedia({provider:'external_link',url:'javascript:alert(1)'}));assert.equal(externalMediaProviders.youtube.revealsTitle,true);
 });

@@ -1,6 +1,6 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import { z } from 'zod';
-import { AppError, contributionSchema, profileSchema, canPublish, normalized, publicContribution, type Contribution, type Review, type Task } from './domain';
+import { AppError, contributionSchema, profileSchema, canPublish, normalized, type Contribution, type Review, type Task } from './domain';
 import { act, createRoom, join, tick, view, type Room, type Action } from './core/game';
 import { publicPages,seoHTML,indexablePage } from './seo';
 import { validateUpload,type PrivateStorage,type MediaPurpose } from './media';
@@ -184,9 +184,6 @@ async function api(req:Request,env:Env){
   }
   if(path==='/api/admin/resolve'&&method==='POST'){
     await isAdmin(req,env);const i=z.object({id:z.string().uuid()}).parse(await body(req));await db`UPDATE reports SET status='resolved' WHERE id=${i.id}`;return json({ok:true});
-  }
-  if(path==='/api/public-contributions'&&method==='GET'){
-    return json({contributions:(await tasks(db)).map(t=>({id:t.id,...publicContribution(t.contribution)}))});
   }
   if(path==='/api/rooms'&&method==='POST'){
     await limit(db,`rooms:${me.id}`,12,3600);

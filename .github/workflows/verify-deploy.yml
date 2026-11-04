@@ -1,5 +1,5 @@
 name: Verify and optionally deploy
-# Manual while free Actions allowance/spending cap and deployment token remain unverified.
+# Manual releases; owner confirmed the separate deployment token and a $0 spending cap.
 on:
   workflow_dispatch:
     inputs:
