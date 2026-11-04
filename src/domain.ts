@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import {normalizeExternalMedia} from './media-providers';
+import type {Locale} from './i18n';
+import type {MessageKey} from './i18n/de';
 
 export class AppError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status:number,public key:MessageKey,public values:Record<string,string|number>={}){super(key);}
 }
-export const ensure = (ok: unknown, message: string, status = 400): asserts ok => {
-  if (!ok) throw new AppError(status, message);
+export const ensure=(ok:unknown,key:MessageKey,status=400):asserts ok=>{
+  if(!ok)throw new AppError(status,key);
 };
 export const normalized = (s: string) => s.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('de');
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -13,7 +15,7 @@ export const rightsBases = ['external_embed','external_link','original_content',
 export {safeURL,youtube} from './urls';
 import {safeURL} from './urls';
 const url = z.string().max(1500).transform((s, ctx) => {
-  try { return safeURL(s); } catch { ctx.addIssue({code:'custom',message:'Ungültiger öffentlicher HTTPS-Link'}); return z.NEVER; }
+  try { return safeURL(s); } catch { ctx.addIssue({code:'custom',message:'error.url'}); return z.NEVER; }
 });
 export const contributionSchema = z.object({
   song: z.object({title:text(180), artists:z.array(text(100)).min(1).max(8), album:z.string().trim().max(180).default(''),
@@ -30,9 +32,9 @@ export const contributionSchema = z.object({
 }).strict().superRefine((v,c) => {
   const answers=[v.song.title,...v.alternatives].map(normalized);
   if(new Set(answers).size !== 4 || v.alternatives.some(a => v.aliases.map(normalized).includes(normalized(a))))
-    c.addIssue({code:'custom',message:'Vier unterschiedliche Titel erforderlich; Alternativen dürfen keine gültigen Aliase sein.'});
+    c.addIssue({code:'custom',message:'error.answersUnique'});
   if(v.kind==='original_hint' && v.rights.basis!=='original_content')
-    c.addIssue({code:'custom',message:'Selbst formulierte Hinweise benötigen die Rechtebasis Eigener Inhalt.'});
+    c.addIssue({code:'custom',message:'error.originalRights'});
   if(v.media) { try { normalizeExternalMedia(v.media); } catch(e) { c.addIssue({code:'custom',message:(e as Error).message}); } }
 });
 export type Contribution = z.infer<typeof contributionSchema>;
@@ -48,5 +50,5 @@ export function canPublish(c:Contribution, review:Review, now=Date.now()) {
   // Audio file publishing is deliberately disabled until private storage and licence acceptance tests pass.
   return false;
 }
-export const profileSchema=z.object({name:text(40),theme:z.enum(['dark','light']).default('dark')}).strict();
+export const profileSchema=z.object({name:text(40),theme:z.enum(['dark','light']).default('dark'),language:z.enum(['de','en']).default('de') satisfies z.ZodType<Locale>}).strict();
 export type Task = {id:string; contribution:Contribution;revision?:number};

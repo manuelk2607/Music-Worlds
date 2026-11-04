@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 const origin=process.env.SMOKE_ORIGIN||'https://music-worlds.maki26.workers.dev';let cookie='';
 async function call(path:string,method='GET',data?:unknown){const r=await fetch(origin+'/api'+path,{method,headers:{Origin:origin,...(cookie?{Cookie:cookie}:{}),...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined});if(r.headers.get('Set-Cookie'))cookie=r.headers.get('Set-Cookie')!.split(';')[0];const value=await r.json() as any;assert.ok(r.ok,`${path}: ${r.status} ${value.error||''}`);return value;}
 try{
-  await call('/session','POST',{name:'Liveprüfung '+crypto.randomUUID().slice(0,8),theme:'dark'});
+  await call('/session','POST',{name:'Liveprüfung '+crypto.randomUUID().slice(0,8),theme:'dark',language:'en'});
   assert.equal((await fetch(origin+'/api/public-contributions',{headers:{Cookie:cookie}})).status,404);
   let room=await call('/rooms','POST',{});const path='/rooms/'+room.code+'/action';
   const act=async(action:string,extra:Record<string,unknown>={})=>{room=await call(path,'POST',{version:room.version,match:room.match,round:room.roundIndex,action,...extra});};

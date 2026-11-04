@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 const origin=process.env.SMOKE_ORIGIN||'https://music-worlds.maki26.workers.dev';
-for(const path of ['/','/spiele','/ueber','/sitemap.xml','/robots.txt','/app.js','/style.css']){
+for(const path of ['/','/spiele','/ueber','/en','/en/games','/en/about','/sitemap.xml','/robots.txt','/app.js','/style.css']){
   const r=await fetch(origin+path);assert.equal(r.status,200,path);const content=await r.text();
-  if(['/','/spiele','/ueber'].includes(path)){assert.match(content,/rel="canonical"/);assert.match(content,/application\/ld\+json/);assert.match(content,/Music-Worlds/);
-    assert.equal(/<meta name="robots" content="([^"]+)"/.exec(content)?.[1],path==='/'?'index,follow':'noindex,nofollow');
-    assert.equal(r.headers.get('X-Robots-Tag'),path==='/'?'index, follow':'noindex, nofollow');}
-  if(path==='/sitemap.xml')assert.equal((content.match(/<url>/g)||[]).length,1);
+  if(['/','/spiele','/ueber','/en','/en/games','/en/about'].includes(path)){assert.match(content,/rel="canonical"/);assert.match(content,/application\/ld\+json/);assert.match(content,/Music-Worlds/);assert.match(content,/hreflang="de"/);assert.match(content,/hreflang="en"/);
+    const landing=['/','/en'].includes(path);assert.equal(/<meta name="robots" content="([^"]+)"/.exec(content)?.[1],landing?'index,follow':'noindex,nofollow');
+    assert.equal(r.headers.get('X-Robots-Tag'),landing?'index, follow':'noindex, nofollow');assert.match(content,new RegExp(`<html lang="${path.startsWith('/en')?'en':'de'}"`));}
+  if(path==='/sitemap.xml')assert.equal((content.match(/<url>/g)||[]).length,2);
   console.log(`${path}: 200`);
 }
 const health=await (await fetch(origin+'/api/health')).json() as any;assert.equal(health.ok,true);assert.equal(health.database,true);

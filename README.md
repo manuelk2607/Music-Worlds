@@ -8,7 +8,7 @@ Vier Bereiche: **Spielen**, **Entdecken**, **Beitragen**, **Profil**. Ein konkre
 
 TypeScript-Worker mit Static Assets, kleiner Browserclient ohne Frameworklaufzeit und eigener Neon-PostgreSQL-Datenbank. Sprachwelten-Konzepte und der lokal vorbereitete portable Quizkern wurden gezielt adaptiert; keine laufende Abhängigkeit von Sprachwelten oder Hub. SQL ist parametrisiert. Räume verwenden atomare Versionsvergleiche; Ergebnisse werden nur beim erfolgreichen Abschluss einmal gespeichert. Anwesenheit liegt getrennt vom Spielzustand. Private Rechtebelege gelangen nicht in öffentliche Projektionen.
 
-`src/core/` enthält Mechanik, `src/domain.ts` Beitrag/Rechtevalidierung, `src/urls.ts` Medien-URLs, `src/media-providers.ts` Anbieter- und spätere autorisierte Wiedergabeverträge, `src/media.ts` private Speicherverträge, `src/worker.ts` HTTP/Persistenz, `src/client.ts` UI. Migrationen unter `migrations/`, reproduzierbare Tests unter `tests/` und `scripts/`.
+`src/core/` enthält Mechanik, `src/domain.ts` Beitrag/Rechtevalidierung, `src/urls.ts` Medien-URLs, `src/media-providers.ts` Anbieter- und spätere autorisierte Wiedergabeverträge, `src/media.ts` private Speicherverträge, `src/worker.ts` HTTP/Persistenz, `src/client.ts` UI und `src/i18n/` die getrennten DE-/EN-Kataloge. Migrationen unter `migrations/`, reproduzierbare Tests unter `tests/` und `scripts/`.
 
 ## Entwickeln und prüfen
 
@@ -35,8 +35,10 @@ Bei Sandbox-Betrieb Wrangler-Log/Registry und npm-Cache auf beschreibbare Projek
 
 Gastprofile verwenden zufällige HttpOnly-/Secure-/SameSite-Cookies; keine E-Mail-/Passwortverwaltung. Profile und Daten können unter Profil gelöscht werden. Moderation unter `/#moderation`: separater `ADMIN_TOKEN`, nur im Arbeitsspeicher des Browsers. Er muss zusätzlich zur eigenen Sitzung vorhanden sein. Den zufälligen lokalen Schlüssel aus `.dev.vars` in einen Passwortmanager übernehmen; niemals in Tickets/Chat/Repository veröffentlichen.
 
-Öffentliche Informationsseiten: `/`, `/spiele`, `/ueber`; individuelle Titel, Description, Canonical, Open Graph, JSON-LD, Sitemap. Auf ausdrücklichen Nutzerwunsch wird ausschließlich die Landingpage `/` indexiert. `/spiele`, `/ueber`, private Screens und APIs bleiben noindex; die Sitemap enthält nur `/`. Die QA bleibt vollständig noindex. Vor einer breiteren Freigabe Verantwortlichen-/Kontaktangaben, Rechtsraum und Datenschutzhinweise vervollständigen.
+Öffentliche Informationsseiten: Deutsch unter `/`, `/spiele`, `/ueber`, Englisch unter `/en`, `/en/games`, `/en/about`. Die Sprache wird beim ersten Besuch aus dem Browser ermittelt (Fallback DE), lokal und bei angemeldeten Gastprofilen zusätzlich serverseitig gespeichert. Die Umschaltung erhält Navigation, Raum und Anmeldung; nutzergenerierte Inhalte werden nicht übersetzt. Für die künftige Worlds-Hub-Identität ist ein explizites `language`-Profilfeld vorbereitet, ohne anwendungsübergreifende Cookies.
 
-Abnahme: 20 Unit-Tests, 66 echte Datenbankprüfungen und vollständiger [Test-/Deployworkflow](https://github.com/manuelk2607/Music-Worlds/actions/runs/41804115829) erfolgreich; Live-Spiel geprüft. [Abschluss und Freigabegrenzen](docs/ACCEPTANCE.md).
+Jede Sprachseite besitzt passende `lang`-, Canonical-, `hreflang`-, Open-Graph- und JSON-LD-Angaben. Auf ausdrücklichen Nutzerwunsch werden ausschließlich die beiden Sprachvarianten der Landingpage (`/`, `/en`) indexiert. Informationsseiten, private Screens und APIs bleiben noindex; die Sitemap enthält genau diese beiden äquivalenten Landingpage-URLs. Die QA bleibt vollständig noindex. Vor einer breiteren Freigabe Verantwortlichen-/Kontaktangaben, Rechtsraum und Datenschutzhinweise vervollständigen.
+
+Abnahme vor Sprachrelease: 22 Unit-Tests und 73 echte isolierte Datenbankprüfungen erfolgreich; Typprüfung, Lint, Audit und Build bestanden. Der aktuelle Test-/Deployworkflow wird in `PROGRESS.md` dokumentiert. [Abschluss und Freigabegrenzen](docs/ACCEPTANCE.md).
 
 Siehe [Betrieb & Kosten](docs/OPERATIONS.md), [Rechte und Quellen](docs/RIGHTS.md), [Sprachwelten-Übernahme](docs/MIGRATION.md), [Worlds Hub](docs/SSO.md), [Prüfnachweise](docs/VERIFICATION.md), [Fortschritt](PROGRESS.md).

@@ -13,19 +13,21 @@ const direct=new URL(connection);direct.hostname=direct.hostname.replace('-poole
 const sql=neon(connection),origin='https://music-worlds.test';
 const env:Env={DATABASE_URL:connection,SESSION_PEPPER:'test-only-'+crypto.randomUUID(),ADMIN_TOKEN:'test-only-admin-token-with-at-least-32-characters',SITE_ORIGIN:origin,HUB_ORIGIN:'https://hub.test',HUB_AUTH_ENABLED:'false',ASSETS:{fetch:async()=>new Response(await readFile('public/index.html','utf8'),{headers:{'Content-Type':'text/html'}})}};
 let checks=0;
-type Client={cookie:string;id:string};
+type Client={cookie:string;id:string;language:'de'|'en'};
 async function request(c:Client|null,path:string,method='GET',data?:unknown,admin=false,foreign=false){
-  const headers:Record<string,string>={Origin:foreign?'https://attacker.test':origin,'CF-Connecting-IP':'192.0.2.'+(c?c.id.charCodeAt(0):'1'),...(c?{Cookie:c.cookie}:{}),...(data?{'Content-Type':'application/json'}:{}),...(admin?{Authorization:'Bearer '+env.ADMIN_TOKEN}:{})};
+  const headers:Record<string,string>={Origin:foreign?'https://attacker.test':origin,'X-MW-Language':c?.language||'de','CF-Connecting-IP':'192.0.2.'+(c?c.id.charCodeAt(0):'1'),...(c?{Cookie:c.cookie}:{}),...(data?{'Content-Type':'application/json'}:{}),...(admin?{Authorization:'Bearer '+env.ADMIN_TOKEN}:{})};
   const r=await worker.fetch(new Request(origin+'/api'+path,{method,headers,body:data?JSON.stringify(data):undefined}),env);
   const value=await r.json() as any;return {status:r.status,body:value,cookie:r.headers.get('Set-Cookie')?.split(';')[0]||''};
 }
 const eq=(actual:unknown,expected:unknown)=>{assert.deepEqual(actual,expected);checks++;};
-async function newClient(name:string){const r=await request(null,'/session','POST',{name,theme:'dark'});eq(r.status,201);return {cookie:r.cookie,id:r.body.id};}
+async function newClient(name:string,language:'de'|'en'='de'){const client={cookie:'',id:'',language};const r=await request(client,'/session','POST',{name,theme:'dark',language});eq(r.status,201);return {cookie:r.cookie,id:r.body.id,language};}
 let a:Client,b:Client,c:Client;
 try{
-  a=await newClient('Integration A');b=await newClient('Integration B');c=await newClient('Integration C');
-  eq((await request(a,'/me')).body.id,a.id);eq((await request(null,'/me')).status,401);
-  const sameSession=await request(a,'/session','POST',{name:'Must not replace an existing profile',theme:'dark'});eq(sameSession.status,200);eq(sameSession.body.id,a.id);
+  a=await newClient('Integration A','en');b=await newClient('Integration B');c=await newClient('Integration C');
+  eq((await request(a,'/me')).body.id,a.id);eq((await request(a,'/me')).body.language,'en');eq((await request(null,'/me')).status,401);
+  const localizedError=await request(a,'/rooms/ABCD2345');eq(localizedError.status,404);eq(localizedError.body.error,'Room not found or expired.');
+  eq((await request(a,'/me','PATCH',{name:'Integration A',theme:'light',language:'de'})).status,200);a.language='de';eq((await request(a,'/me')).body.language,'de');
+  const sameSession=await request(a,'/session','POST',{name:'Must not replace an existing profile',theme:'dark',language:'en'});eq(sameSession.status,200);eq(sameSession.body.id,a.id);
   eq((await request(a,'/rooms','POST',{},false,true)).status,403);
   let r=await request(a,'/rooms','POST',{});eq(r.status,201);let room=r.body;const code=room.code;
   eq((await request(b,'/rooms/'+code)).status,403);eq((await request(b,'/rooms/'+code+'/join','POST',{})).status,200);
@@ -82,7 +84,7 @@ try{
   const privateFile=await worker.fetch(new Request(origin+'/api/media/'+asset.id,{headers:{Cookie:c.cookie}}),env);
   eq(privateFile.status,200);assert.match(privateFile.headers.get('Content-Disposition')||'',/^attachment/);checks++;
   const unsafe=await worker.fetch(new Request(origin+'/api/media?purpose=evidence',{method:'POST',headers:{Origin:origin,Cookie:c.cookie,'Content-Type':'text/html'},body:'<script>not a PDF</script>'}),env);eq(unsafe.status,415);
-  const seo=await worker.fetch(new Request(origin+'/spiele'),env);eq(seo.status,200);assert.match(await seo.text(),/rel="canonical"/);checks++;
+  const seo=await worker.fetch(new Request(origin+'/en/games'),env);eq(seo.status,200);const seoHTML=await seo.text();assert.match(seoHTML,/rel="canonical"/);assert.match(seoHTML,/<html lang="en"/);assert.match(seoHTML,/hreflang="de"/);checks+=3;
   eq((await request(c,'/me','DELETE',{confirm:'DELETE'})).status,200);eq((await request(c,'/me')).status,401);
   eq(objects.size,0);
   const left=await sql`SELECT count(*)::int n FROM profiles WHERE id=${c.id}`;eq(left[0].n,0);
@@ -91,7 +93,7 @@ try{
   eq(adminAfterDeletion.reports.some((report:any)=>report.contribution_id===contributionId),false);
   eq(adminAfterDeletion.contributions.every((entry:any)=>!!entry.body.song?.title),true);
   eq((await sql`SELECT count(*)::int n FROM songs WHERE title=${input.song.title}`)[0].n,0);
-  console.log(`${checks} integration assertions passed: real isolated PostgreSQL, concurrent votes/edits, moderation, rights, reports, deletion, reload and SEO.`);
+  console.log(`${checks} integration assertions passed: real isolated PostgreSQL, bilingual profile/error persistence, concurrent votes/edits, moderation, rights, reports, deletion, reload and localized SEO.`);
 }finally{
   for(const client of [a!,b!,c!].filter(Boolean)){try{await request(client,'/me','DELETE',{confirm:'DELETE'});}catch{}}
 }

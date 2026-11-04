@@ -9,12 +9,13 @@
   <script type="module" src="/app.js"></script>
 </head>
 <body>
-  <a class="skip" href="#main">Zum Inhalt</a>
-  <header class="header"><a class="brand" href="/#spielen" aria-label="Music-Worlds Startseite"><span class="brand-icon">♫</span>music<span>worlds</span><span class="beta">FAMILY EDITION</span></a>
-    <nav aria-label="Hauptnavigation"><a href="/#spielen" data-nav="spielen">Spielen</a><a href="/#entdecken" data-nav="entdecken">Entdecken</a><a href="/#beitragen" data-nav="beitragen">Beitragen</a><a href="/#profil" data-nav="profil">Profil</a></nav>
+  <a class="skip" href="#main" data-i18n="nav.skip">Zum Inhalt</a>
+  <header class="header"><a class="brand" href="/#spielen" aria-label="Music-Worlds Startseite" data-i18n-aria="nav.home"><span class="brand-icon">♫</span>music<span>worlds</span><span class="beta">FAMILY EDITION</span></a>
+    <nav aria-label="Hauptnavigation" data-i18n-aria="nav.label"><a href="/#spielen" data-nav="spielen" data-i18n="nav.play">Spielen</a><a href="/#entdecken" data-nav="entdecken" data-i18n="nav.discover">Entdecken</a><a href="/#beitragen" data-nav="beitragen" data-i18n="nav.contribute">Beitragen</a><a href="/#profil" data-nav="profil" data-i18n="nav.profile">Profil</a></nav>
+    <div class="language-switch" role="group" aria-label="Sprache"><button type="button" data-language="de" lang="de" aria-pressed="true">DE</button><button type="button" data-language="en" lang="en" aria-pressed="false">EN</button></div>
     <a class="hub-link" href="https://worlds-hub.maki26.workers.dev/" target="_blank" rel="noopener noreferrer">Worlds Hub ↗</a>
   </header>
   <main id="main" tabindex="-1"></main>
-  <footer><a class="brand small" href="/#spielen">♫ music worlds</a><span>Musik verbindet. Spielen auch.</span><a href="/ueber">Rechte & Datenschutz</a><a href="/spiele">Spielregeln</a><a href="/#moderation">Moderation</a><a href="https://sprachwelten.maki26.workers.dev/" target="_blank" rel="noopener noreferrer">Sprachwelten ↗</a><a href="https://it-worlds.maki26.workers.dev/" target="_blank" rel="noopener noreferrer">IT-Worlds ↗</a><a href="https://slopurself.maki26.workers.dev/" target="_blank" rel="noopener noreferrer">Slop Urself ↗</a></footer>
+  <footer><a class="brand small" href="/#spielen">♫ music worlds</a><span data-i18n="footer.tagline">Musik verbindet. Spielen auch.</span><a href="/ueber" data-local-page="about" data-i18n="footer.rights">Rechte & Datenschutz</a><a href="/spiele" data-local-page="games" data-i18n="footer.rules">Spielregeln</a><a href="/#moderation" data-nav="moderation" data-i18n="footer.moderation">Moderation</a><a href="https://sprachwelten.maki26.workers.dev/" target="_blank" rel="noopener noreferrer">Sprachwelten ↗</a><a href="https://it-worlds.maki26.workers.dev/" target="_blank" rel="noopener noreferrer">IT-Worlds ↗</a><a href="https://slopurself.maki26.workers.dev/" target="_blank" rel="noopener noreferrer">Slop Urself ↗</a></footer>
   <div id="notice" role="status" aria-live="polite"></div><dialog id="dialog"></dialog>
 </body></html>

@@ -9,4 +9,6 @@ export interface IdentityLinkStore {
   /** Requires explicit consent and fresh proof of both the existing local session and central identity. */
   link(input:{localProfileId:string;hub:VerifiedHubIdentity;localProofId:string;centralProofId:string}):Promise<void>;
 }
+/** A future central profile can carry this validated preference without shared cookies. */
+export interface HubLanguagePreference {language:'de'|'en';updatedAt:string}
 export const hubAuthenticationStatus={enabled:false,reason:'OIDC issuer/client registration and real linking/logout acceptance are not available yet.'} as const;

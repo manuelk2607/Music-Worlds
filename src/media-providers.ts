@@ -15,7 +15,7 @@ export const externalMediaProviders:Record<ExternalProviderId,ExternalMediaProvi
 };
 export function normalizeExternalMedia(reference:ExternalMediaReference):ExternalPlaybackSource{
   const provider=externalMediaProviders[reference.provider??'youtube'];
-  if(!provider)throw new Error('Nicht unterstützter Medienanbieter.');
+  if(!provider)throw new Error('error.mediaProvider');
   return provider.normalize(reference);
 }
 
