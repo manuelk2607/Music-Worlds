@@ -37,4 +37,6 @@ Gastprofile verwenden zufällige HttpOnly-/Secure-/SameSite-Cookies; keine E-Mai
 
 Öffentliche Informationsseiten: `/`, `/spiele`, `/ueber`; individuelle Titel, Description, Canonical, Open Graph, JSON-LD, Sitemap. Auf ausdrücklichen Nutzerwunsch wird ausschließlich die Landingpage `/` indexiert. `/spiele`, `/ueber`, private Screens und APIs bleiben noindex; die Sitemap enthält nur `/`. Die QA bleibt vollständig noindex. Vor einer breiteren Freigabe Verantwortlichen-/Kontaktangaben, Rechtsraum und Datenschutzhinweise vervollständigen.
 
+Abnahme: 20 Unit-Tests, 66 echte Datenbankprüfungen und vollständiger [Test-/Deployworkflow](https://github.com/manuelk2607/Music-Worlds/actions/runs/41804115829) erfolgreich; Live-Spiel geprüft. [Abschluss und Freigabegrenzen](docs/ACCEPTANCE.md).
+
 Siehe [Betrieb & Kosten](docs/OPERATIONS.md), [Rechte und Quellen](docs/RIGHTS.md), [Sprachwelten-Übernahme](docs/MIGRATION.md), [Worlds Hub](docs/SSO.md), [Prüfnachweise](docs/VERIFICATION.md), [Fortschritt](PROGRESS.md).
