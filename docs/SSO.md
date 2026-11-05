@@ -10,11 +10,11 @@ Die Route benötigt `HUB_GUEST_LINK_ENABLED=true` und `HUB_REAUTH_VERIFIED=true`
 
 Der Test mit signiertem OIDC-Fixture und isoliertem Neon prüfte die Umschaltung, CSRF, abgelaufene Nachweise, den Wechsel des Gastkontos und zwei gleichzeitige Bestätigungen. Genau eine Bestätigung war erfolgreich. UUID, gespeicherte Punkte und Sprache blieben erhalten. Der Test prüfte außerdem den Rückfall bei deaktiviertem SSO und den gezielten Sitzungswiderruf. Der Bestätigungsdialog wurde auf Deutsch und Englisch mit lokalen Testantworten im Browser geprüft.
 
-## Stand 05.11.2026
+## Anmeldung und neues Musikprofil vom 05.11.2026
 
 Der Branch `feature/worlds-hub-sso` verwendet die gemeinsame OIDC-Implementierung aus Worlds Hub `049279b`. `HUB_AUTH_ENABLED` ist in beiden Worker-Konfigurationen aus. Für die spätere Abnahme gelten der zentrale Neon-Issuer, der registrierte Music-Client, `https://music-worlds.maki26.workers.dev/auth/callback` und die Music-API-Resource. Die öffentliche Hub-URL bleibt der Navigationslink.
 
-Der Callback erzeugt eine Music-eigene Sitzung. Nach ausdrücklicher Profilerstellung wird die geprüfte Kombination aus Issuer und Subject einer lokalen UUID zugeordnet. Ein Gastprofil behält seinen eigenen Cookie und seine UUID. Wenn eine Worlds-Sitzung vorliegt, prüft der Worker diese zuerst. Eine abgelaufene oder unverknüpfte Worlds-Sitzung erhält keinen Zugriff auf ein Gastprofil. Das lokale Logout widerruft die Worlds-Sitzung in Music und kehrt zur Profilansicht zurück. Eine Gastprofilübernahme benötigt noch den frischen zentralen Nachweis, die gültige Gastsitzung und eine Bestätigung für genau dieses Profil.
+Der Callback erzeugt eine Music-eigene Sitzung. Nach ausdrücklicher Profilerstellung wird die geprüfte Kombination aus Issuer und Subject einer lokalen UUID zugeordnet. Ein Gastprofil behält seinen eigenen Cookie und seine UUID. Wenn eine Worlds-Sitzung vorliegt, prüft der Worker diese zuerst. Eine abgelaufene oder unverknüpfte Worlds-Sitzung erhält keinen Zugriff auf ein Gastprofil. Das lokale Logout widerruft die Worlds-Sitzung in Music und kehrt zur Profilansicht zurück.
 
 Migration 005 wurde auf dem bestehenden Neon-Zweig `qa-initial` angewendet. SHA-256 `3e7d382708a70ad6aeca7433484404a8b32208293f4f3fc626de919023022041`. Der Integrationstest nutzt dort eine signierte OIDC-Testantwort und echte Postgres-Transaktionen. Er prüft den deaktivierten Einstieg, PKCE, CSRF, genau ein Profil bei paralleler Erstellung, Erhalt der Gast-UUID und Widerruf beim Logout. Zusätzlich liefen 73 bestehende Integrationsprüfungen, 22 Unit-Tests, Typprüfung, Lint und der Worker-Trockenlauf erfolgreich. Die DE/EN-Profilansicht und der Dialog wurden mit einer lokalen Testantwort im Browser geprüft.
 
