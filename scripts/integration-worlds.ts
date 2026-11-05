@@ -11,6 +11,7 @@ await migrate(connection.href);
 const db=neon(connection.href);
 const origin='https://music.example.invalid',issuer='https://music-issuer.example.invalid',client='music-test';
 const subject=randomUUID(),profileName='S '+subject,guestName='G '+subject;
+const linkSubject=randomUUID(),otherGuestName='X '+linkSubject;
 const key=await generateKeyPair('EdDSA',{extractable:true});
 const jwk={...await exportJWK(key.publicKey),kid:'fixture',alg:'EdDSA',use:'sig'};
 const env:Env={DATABASE_URL:connection.href,SESSION_PEPPER:randomUUID(),ADMIN_TOKEN:'',SITE_ORIGIN:origin,
@@ -21,7 +22,8 @@ const ip='192.0.2.93',ipKey=digest(ip+env.SESSION_PEPPER);
 const rateKeys=['ip:'+ipKey,'session:'+ipKey,...['login','callback','logout'].map(path=>'worlds:/auth/'+path+':'+ipKey)];
 const originalFetch=globalThis.fetch;
 let authorization:URL|undefined;
-let transactionId:string|undefined;
+const transactions:string[]=[];
+let tokenSubject=subject,authTime:number|undefined,linkSessionKey:string|undefined;
 globalThis.fetch=async(input,init)=>{
  const url=new URL(input instanceof Request?input.url:String(input));
  if(url.origin!==issuer){
@@ -40,8 +42,8 @@ globalThis.fetch=async(input,init)=>{
  assert.equal(form.get('redirect_uri'),origin+'/auth/callback');
  assert.equal(form.get('resource'),env.HUB_OIDC_RESOURCE);
  assert.equal(createHash('sha256').update(form.get('code_verifier')??'').digest('base64url'),authorization?.searchParams.get('code_challenge'));
- const token=await new SignJWT({nonce:authorization?.searchParams.get('nonce'),email:'fixture@example.invalid',email_verified:true})
-  .setProtectedHeader({alg:'EdDSA',kid:'fixture'}).setIssuer(issuer).setAudience(client).setSubject(subject).setIssuedAt().setExpirationTime('5m').sign(key.privateKey);
+ const token=await new SignJWT({nonce:authorization?.searchParams.get('nonce'),email:'fixture@example.invalid',email_verified:true,auth_time:authTime})
+  .setProtectedHeader({alg:'EdDSA',kid:'fixture'}).setIssuer(issuer).setAudience(client).setSubject(tokenSubject).setIssuedAt().setExpirationTime('5m').sign(key.privateKey);
  return Response.json({access_token:'fixture-only',token_type:'Bearer',id_token:token});
 };
 const call=(path:string,options:{method?:string;cookie?:string;body?:BodyInit;json?:unknown}={},config=env)=>{
@@ -66,7 +68,7 @@ try{
  const begin=await call('/auth/login?next=%2Fen%23profil&ui_locales=en',{method:'POST',cookie:guestCookie});
  assert.equal(begin.status,200);
  const binding=cookie(begin,'__Host-worlds-transaction');
- transactionId=digest(binding.split('=')[1]);
+ transactions.push(digest(binding.split('=')[1]));
  authorization=new URL((await begin.json() as {url:string}).url);
  assert.equal(authorization.searchParams.get('code_challenge_method'),'S256');
  const finish=await call('/auth/callback?'+new URLSearchParams({code:'fixture',state:authorization.searchParams.get('state')!}),{cookie:binding});
@@ -86,13 +88,61 @@ try{
  assert.equal(logout.status,303);
  assert.equal((await call('/api/me',{cookie:both})).status,401);
  assert.equal((await (await call('/api/me',{cookie:guestCookie})).json() as {id:string}).id,guestId);
- console.log('PASS: Music-Worlds signed OIDC fixture with isolated Neon, CSRF, one concurrent profile, local UUID and guest preservation, and session revocation.');
+ const otherGuest=await call('/api/session',{method:'POST',json:{name:otherGuestName,theme:'dark',language:'de'}});
+ assert.equal(otherGuest.status,201);
+ const otherGuestCookie=cookie(otherGuest,'__Host-mw');
+ const otherGuestId=(await otherGuest.json() as {id:string}).id;
+ await db`INSERT INTO results(match_id,profile_id,score,rounds,won) VALUES (${randomUUID()},${guestId},7,9,true)`;
+ tokenSubject=linkSubject;
+ authTime=Math.floor(Date.now()/1000);
+ const linkEnv={...env,HUB_GUEST_LINK_ENABLED:'true',HUB_REAUTH_VERIFIED:'true'};
+ const fresh=await call('/auth/login?reauth=1&next=%2Fen%23profil',{method:'POST',cookie:guestCookie},linkEnv);
+ assert.equal(fresh.status,200);
+ const linkBinding=cookie(fresh,'__Host-worlds-transaction');
+ transactions.push(digest(linkBinding.split('=')[1]));
+ authorization=new URL((await fresh.json() as {url:string}).url);
+ assert.equal(authorization.searchParams.get('max_age'),'0');
+ assert.equal(authorization.searchParams.get('prompt'),'login');
+ const verified=await call('/auth/callback?'+new URLSearchParams({code:'link-fixture',state:authorization.searchParams.get('state')!}),{cookie:linkBinding},linkEnv);
+ assert.equal(verified.status,303);
+ const linkCookie=cookie(verified,'__Host-worlds-session');
+ linkSessionKey=digest(linkCookie.split('=')[1]);
+ const credentials=linkCookie+'; '+guestCookie;
+ const linkStatus=await (await call('/api/worlds/status',{cookie:credentials},linkEnv)).json() as {csrf:string;guestLink:boolean};
+ assert.equal(linkStatus.guestLink,true);
+ const link=(step:string,data:Record<string,unknown>,selected=credentials,config=linkEnv)=>call('/api/worlds/link/'+step,{method:'POST',cookie:selected,json:data},config);
+ assert.equal((await link('prepare',{csrf:linkStatus.csrf},credentials,{...linkEnv,HUB_REAUTH_VERIFIED:'false'})).status,404);
+ assert.equal((await link('prepare',{csrf:'invalid'})).status,403);
+ assert.equal((await link('prepare',{csrf:linkStatus.csrf,profileId:otherGuestId})).status,400);
+ await db`UPDATE worlds_auth_sessions SET payload=jsonb_set(payload,'{authenticatedAt}',to_jsonb(${Date.now()-301_000}::bigint)) WHERE id=${linkSessionKey}`;
+ assert.equal((await link('prepare',{csrf:linkStatus.csrf})).status,403);
+ await db`UPDATE worlds_auth_sessions SET payload=jsonb_set(payload,'{authenticatedAt}',to_jsonb(${authTime*1000}::bigint)) WHERE id=${linkSessionKey}`;
+ const prepare=()=>link('prepare',{csrf:linkStatus.csrf});
+ const stale=await prepare();assert.equal(stale.status,200);
+ const staleProof=(await stale.json() as {proof:string}).proof;
+ await db`UPDATE worlds_guest_link_proofs SET expires_at=now()-interval '1 second' WHERE proof_hash=${digest(staleProof)}`;
+ const confirm=(proof:string,selected=credentials)=>link('confirm',{csrf:linkStatus.csrf,proof},selected);
+ assert.equal((await confirm(staleProof)).status,409);
+ const review=await prepare();assert.equal(review.status,200);
+ const staged=await review.json() as {proof:string;guestName:string;worldsEmail:string};
+ assert.equal(staged.guestName,guestName);assert.equal(staged.worldsEmail,'fixture@example.invalid');
+ assert.equal((await confirm(staged.proof,linkCookie+'; '+otherGuestCookie)).status,409);
+ assert.deepEqual((await Promise.all([confirm(staged.proof),confirm(staged.proof)])).map(r=>r.status).sort(),[200,409]);
+ const linked=await (await call('/api/me',{cookie:linkCookie},linkEnv)).json() as {id:string;language:string;stats:{points:number}};
+ assert.equal(linked.id,guestId);assert.equal(linked.language,'de');assert.equal(linked.stats.points,7);
+ assert.equal((await call('/api/me',{cookie:guestCookie},{...linkEnv,HUB_AUTH_ENABLED:'false'})).status,200);
+ const ended=await call('/auth/logout',{method:'POST',cookie:credentials,body:new URLSearchParams({csrf:linkStatus.csrf})},linkEnv);
+ assert.equal(ended.status,303);
+ assert.ok(ended.headers.getSetCookie().some(value=>value.startsWith('__Host-mw=;')));
+ assert.equal((await call('/api/me',{cookie:guestCookie},linkEnv)).status,401);
+ assert.equal((await call('/api/me',{cookie:otherGuestCookie},linkEnv)).status,200);
+ console.log('PASS: isolated Music OIDC and guest linking preserve UUID, results and language. Wrong/stale proofs, switched profiles and duplicate confirmations are rejected.');
 }finally{
  globalThis.fetch=originalFetch;
  await db.transaction([
-  db`DELETE FROM worlds_auth_transactions WHERE id=${transactionId??''}`,
-  db`DELETE FROM worlds_auth_sessions WHERE issuer=${issuer} AND subject=${subject}`,
-  db`DELETE FROM profiles WHERE name IN (${profileName},${guestName})`,
-  db`DELETE FROM rate_limits WHERE key=ANY(${rateKeys}::text[])`,
+  db`DELETE FROM worlds_auth_transactions WHERE id=ANY(${transactions}::text[])`,
+  db`DELETE FROM worlds_auth_sessions WHERE issuer=${issuer} AND subject IN (${subject},${linkSubject})`,
+  db`DELETE FROM profiles WHERE name IN (${profileName},${guestName},${otherGuestName})`,
+  db`DELETE FROM rate_limits WHERE key=ANY(${[...rateKeys,'worlds:link:'+linkSessionKey]}::text[])`,
  ]);
 }

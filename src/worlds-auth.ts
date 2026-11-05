@@ -7,13 +7,16 @@ import type {Env} from './worker';
 export function hubConfigured(env:Env){
  return env.HUB_AUTH_ENABLED==='true'&&!!env.DATABASE_URL&&!!env.HUB_OIDC_ISSUER&&!!env.HUB_OIDC_CLIENT_ID;
 }
+export function guestLinkEnabled(env:Env){
+ return hubConfigured(env)&&env.HUB_GUEST_LINK_ENABLED==='true'&&env.HUB_REAUTH_VERIFIED==='true';
+}
 export function hubConfig(env:Env):AuthConfig|null{
  if(!hubConfigured(env))return null;
  const origin=new URL(env.SITE_ORIGIN);
  if(origin.protocol!=='https:'||origin.origin!==env.SITE_ORIGIN)throw new AppError(503,'error.setup');
  const db=neon(env.DATABASE_URL);
  return {origin:origin.origin,issuer:env.HUB_OIDC_ISSUER!,clientId:env.HUB_OIDC_CLIENT_ID!,
-  resource:env.HUB_OIDC_RESOURCE,algorithm:'EdDSA',store:new PostgresAuthStore((text,values)=>db.query(text,values)),
+  resource:env.HUB_OIDC_RESOURCE,algorithm:'EdDSA',reauthEnabled:guestLinkEnabled(env),store:new PostgresAuthStore((text,values)=>db.query(text,values)),
   returnPaths:['/#profil','/en#profil'],signedOutPaths:{de:'/#profil',en:'/en#profil'}};
 }
 export function hasHubSession(request:Request,env:Env){

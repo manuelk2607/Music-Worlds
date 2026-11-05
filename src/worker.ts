@@ -8,14 +8,18 @@ import {isMessageKey,localeFrom,t,type Locale} from './i18n';
 import type {MessageKey} from './i18n/de';
 import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_COOKIE,startLogin} from '@worlds-hub/auth';
 import {hash as authHash} from '@worlds-hub/auth/store';
-import {hasHubSession,hubConfig,hubConfigured,hubSession} from './worlds-auth';
+import {guestLinkEnabled,hasHubSession,hubConfig,hubConfigured,hubSession} from './worlds-auth';
 
-export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
+export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_GUEST_LINK_ENABLED?:string;HUB_REAUTH_VERIFIED?:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
 type DB=NeonQueryFunction<false,false>;
 type Identity={id:string;name:string;theme:string;language:Locale;source?:'worlds'};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const hash=async(s:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32))).map(x=>x.toString(16).padStart(2,'0')).join('');
+function guestCookie(req:Request){
+ const value=readCookie(req,'__Host-mw');
+ return value&&/^[a-f0-9]{64}$/.test(value)?value:undefined;
+}
 const must=(ok:unknown,key:MessageKey,status=400)=>{if(!ok)throw new AppError(status,key);};
 async function body(req:Request){
   must(req.headers.get('Content-Type')?.split(';')[0]==='application/json','error.jsonExpected',415);
@@ -33,7 +37,7 @@ async function identity(req:Request,db:DB,env:Env):Promise<Identity>{
     if(!profile)throw new AppError(403,'error.worldsProfileRequired');
     return {...profile,source:'worlds'} as Identity;
   }
-  const value=/(?:^|;\s*)__Host-mw=([a-f0-9]{64})(?:;|$)/.exec(req.headers.get('Cookie')||'')?.[1];
+  const value=guestCookie(req);
   must(value,'error.playerRequired',401);
   const rows=await db`SELECT p.id,p.name,p.theme,p.language FROM sessions s JOIN profiles p ON p.id=s.profile_id WHERE s.token_hash=${await hash(value!+env.SESSION_PEPPER)} AND s.expires_at>now()`;
   must(rows[0],'error.sessionExpired',401);return rows[0] as Identity;
@@ -57,7 +61,26 @@ async function worldsAuth(req:Request,env:Env){
  const ip=await hash((req.headers.get('CF-Connecting-IP')||'local')+env.SESSION_PEPPER);
  if(env.READ_LIMIT)must((await env.READ_LIMIT.limit({key:ip})).success,'error.tooMany',429);
  await limit(neon(env.DATABASE_URL),`worlds:${url.pathname}:${ip}`,12,600);
- try{return await handler(req,config);}
+ try{
+  let guestRevoked=false;
+  const guest=handler===logout?guestCookie(req):undefined;
+  if(guest){
+   const db=neon(env.DATABASE_URL),guestKey=await hash(guest+env.SESSION_PEPPER);
+   // The shared handler calls this only after validating the session and CSRF.
+   // End both credentials when they refer to the same local profile.
+   config.store.deleteSession=async sessionKey=>{
+    const rows=await db`WITH revoked AS (
+      DELETE FROM worlds_auth_sessions WHERE id=${sessionKey} RETURNING issuer,subject
+    ) DELETE FROM sessions g USING revoked r,worlds_identity_links l
+      WHERE l.issuer=r.issuer AND l.subject=r.subject AND g.profile_id=l.local_profile_id
+        AND g.token_hash=${guestKey} RETURNING g.token_hash`;
+    guestRevoked=rows.length>0;
+   };
+  }
+  const response=await handler(req,config);
+  if(guestRevoked)response.headers.append('Set-Cookie',cookie('__Host-mw','',0));
+  return response;
+ }
  catch{throw new AppError(503,'error.worldsUnavailable');}
 }
 async function isAdmin(req:Request,env:Env){
@@ -128,7 +151,56 @@ async function api(req:Request,env:Env){
   if(path==='/api/worlds/status'&&method==='GET'){
     const central=await hubSession(req,env);
     const linked=central?await db`SELECT 1 FROM worlds_identity_links WHERE issuer=${central.issuer} AND subject=${central.sub}`:[];
-    return json({enabled:hubConfigured(env),authenticated:!!central,linked:linked.length>0,csrf:central?.csrf});
+    return json({enabled:hubConfigured(env),authenticated:!!central,linked:linked.length>0,csrf:central?.csrf,
+      guestLink:guestLinkEnabled(env)&&!!central&&!linked.length&&!!guestCookie(req)});
+  }
+  if(path==='/api/worlds/link/prepare'||path==='/api/worlds/link/confirm'){
+    if(!guestLinkEnabled(env))throw new AppError(404,'error.functionNotFound');
+    must(method==='POST','error.functionNotFound',405);
+    const central=await hubSession(req,env);
+    const raw=readCookie(req,SESSION_COOKIE),guest=guestCookie(req);
+    if(!central||!raw)throw new AppError(401,'error.sessionExpired');
+    const prepare=path.endsWith('/prepare');
+    const schema=z.object({csrf:z.string().max(128)}).strict();
+    const input=prepare?schema.parse(await body(req)):schema.extend({proof:z.string().regex(/^[a-f0-9]{64}$/)}).parse(await body(req));
+    must(input.csrf===central.csrf,'error.foreignSite',403);
+    const now=Date.now();
+    const authenticatedAt=central.authenticatedAt;
+    if(typeof authenticatedAt!=='number'||!Number.isFinite(authenticatedAt)||authenticatedAt>now||authenticatedAt<=now-300_000){
+      throw new AppError(403,'error.worldsReauth');
+    }
+    if(!guest)throw new AppError(403,'error.worldsGuestMissing');
+    const centralKey=await authHash(raw),guestKey=await hash(guest+env.SESSION_PEPPER);
+    await limit(db,'worlds:link:'+centralKey,8,600);
+    if(prepare){
+      const proof=token();
+      const [review]=await db`WITH staged AS (
+        INSERT INTO worlds_guest_link_proofs(proof_hash,central_session_id,guest_session_hash,local_profile_id,expires_at)
+        SELECT ${await authHash(proof)},c.id,g.token_hash,g.profile_id,
+          LEAST(to_timestamp(${authenticatedAt+300_000}::double precision / 1000),to_timestamp(c.expires::double precision / 1000),g.expires_at)
+        FROM worlds_auth_sessions c CROSS JOIN sessions g
+        WHERE c.id=${centralKey} AND c.issuer=${central.issuer} AND c.subject=${central.sub}
+          AND c.expires>extract(epoch FROM now())*1000 AND g.token_hash=${guestKey} AND g.expires_at>now()
+          AND NOT EXISTS(SELECT 1 FROM worlds_identity_links l
+            WHERE (l.issuer=c.issuer AND l.subject=c.subject) OR l.local_profile_id=g.profile_id)
+        RETURNING local_profile_id
+      ) SELECT p.name FROM staged JOIN profiles p ON p.id=staged.local_profile_id`;
+      if(!review)throw new AppError(409,'error.worldsLinkRefused');
+      return json({proof,guestName:review.name,worldsEmail:central.email});
+    }
+    const proof='proof' in input?input.proof:undefined;
+    if(typeof proof!=='string')throw new AppError(400,'error.validation');
+    const linked=await db`WITH consumed AS (
+      DELETE FROM worlds_guest_link_proofs p USING worlds_auth_sessions c,sessions g
+      WHERE p.proof_hash=${await authHash(proof)} AND p.central_session_id=c.id AND p.guest_session_hash=g.token_hash
+        AND c.id=${centralKey} AND c.issuer=${central.issuer} AND c.subject=${central.sub}
+        AND g.token_hash=${guestKey} AND g.profile_id=p.local_profile_id
+        AND p.expires_at>now() AND g.expires_at>now() AND c.expires>extract(epoch FROM now())*1000
+      RETURNING p.local_profile_id
+    ) INSERT INTO worlds_identity_links(issuer,subject,local_profile_id)
+      SELECT ${central.issuer},${central.sub},local_profile_id FROM consumed RETURNING local_profile_id`;
+    if(!linked.length)throw new AppError(409,'error.worldsLinkRefused');
+    return json({linked:true});
   }
   if(path==='/api/worlds/profile'&&method==='POST'){
     if(!hubConfigured(env))throw new AppError(404,'error.functionNotFound');
@@ -187,7 +259,7 @@ async function api(req:Request,env:Env){
   }
   if(path==='/api/logout'&&method==='POST'){
     if(me.source==='worlds')throw new AppError(400,'error.worldsLogout');
-    const secret=/(?:^|;\s*)__Host-mw=([a-f0-9]{64})/.exec(req.headers.get('Cookie')||'')?.[1];
+    const secret=guestCookie(req);
     if(secret)await db`DELETE FROM sessions WHERE token_hash=${await hash(secret+env.SESSION_PEPPER)}`;
     const r=json({ok:true});r.headers.set('Set-Cookie','__Host-mw=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');return r;
   }
@@ -326,6 +398,8 @@ export default {
       db`DELETE FROM sessions WHERE token_hash IN(SELECT token_hash FROM sessions WHERE expires_at<now() LIMIT 1000)`,
       db`DELETE FROM rate_limits WHERE key IN(SELECT key FROM rate_limits WHERE expires_at<now() LIMIT 1000)`,
       ...(hubConfigured(env)?['worlds_auth_transactions','worlds_auth_sessions','worlds_auth_replays'].map(table=>
-       db.query(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} WHERE expires<extract(epoch FROM now())*1000 LIMIT 1000)`)):[])]);
+       db.query(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} WHERE expires<extract(epoch FROM now())*1000 LIMIT 1000)`)):[]),
+      ...(env.HUB_GUEST_LINK_ENABLED==='true'?[db`DELETE FROM worlds_guest_link_proofs
+       WHERE proof_hash IN(SELECT proof_hash FROM worlds_guest_link_proofs WHERE expires_at<=now() LIMIT 500)`]:[])]);
   }
 };
