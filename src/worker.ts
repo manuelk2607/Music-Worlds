@@ -6,10 +6,13 @@ import { publicPages,seoHTML,indexablePage } from './seo';
 import { validateUpload,type PrivateStorage,type MediaPurpose } from './media';
 import {isMessageKey,localeFrom,t,type Locale} from './i18n';
 import type {MessageKey} from './i18n/de';
+import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_COOKIE,startLogin} from '@worlds-hub/auth';
+import {hash as authHash} from '@worlds-hub/auth/store';
+import {hasHubSession,hubConfig,hubConfigured,hubSession} from './worlds-auth';
 
-export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
+export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
 type DB=NeonQueryFunction<false,false>;
-type Identity={id:string;name:string;theme:string;language:Locale};
+type Identity={id:string;name:string;theme:string;language:Locale;source?:'worlds'};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
 const hash=async(s:string)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))).map(x=>x.toString(16).padStart(2,'0')).join('');
 const token=()=>Array.from(crypto.getRandomValues(new Uint8Array(32))).map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -22,6 +25,14 @@ async function body(req:Request){
   try{return JSON.parse(new TextDecoder().decode(all));}catch{throw new AppError(400,'error.json');}
 }
 async function identity(req:Request,db:DB,env:Env):Promise<Identity>{
+  if(hasHubSession(req,env)){
+    const central=await hubSession(req,env);
+    if(!central)throw new AppError(401,'error.sessionExpired');
+    const [profile]=await db`SELECT p.id,p.name,p.theme,p.language FROM worlds_identity_links l
+      JOIN profiles p ON p.id=l.local_profile_id WHERE l.issuer=${central.issuer} AND l.subject=${central.sub}`;
+    if(!profile)throw new AppError(403,'error.worldsProfileRequired');
+    return {...profile,source:'worlds'} as Identity;
+  }
   const value=/(?:^|;\s*)__Host-mw=([a-f0-9]{64})(?:;|$)/.exec(req.headers.get('Cookie')||'')?.[1];
   must(value,'error.playerRequired',401);
   const rows=await db`SELECT p.id,p.name,p.theme,p.language FROM sessions s JOIN profiles p ON p.id=s.profile_id WHERE s.token_hash=${await hash(value!+env.SESSION_PEPPER)} AND s.expires_at>now()`;
@@ -30,6 +41,24 @@ async function identity(req:Request,db:DB,env:Env):Promise<Identity>{
 async function limit(db:DB,key:string,max:number,seconds=60){
   const rows=await db`INSERT INTO rate_limits(key,count,expires_at) VALUES (${key},1,now()+${seconds}*interval '1 second') ON CONFLICT(key) DO UPDATE SET count=CASE WHEN rate_limits.expires_at<now() THEN 1 ELSE rate_limits.count+1 END,expires_at=CASE WHEN rate_limits.expires_at<now() THEN excluded.expires_at ELSE rate_limits.expires_at END RETURNING count`;
   must(rows[0].count<=max,'error.tooMany',429);
+}
+async function worldsAuth(req:Request,env:Env){
+ const config=hubConfig(env);
+ if(!config)throw new AppError(404,'error.functionNotFound');
+ const url=new URL(req.url);
+ const routes={'/auth/login':startLogin,'/auth/callback':callback,'/auth/logout':logout,'/auth/backchannel-logout':backchannelLogout} as const;
+ const handler=Object.hasOwn(routes,url.pathname)?routes[url.pathname as keyof typeof routes]:undefined;
+ if(!handler)throw new AppError(404,'error.functionNotFound');
+ must(url.origin===config.origin,'error.foreignSite',403);
+ must(req.method===(handler===callback?'GET':'POST'),'error.functionNotFound',405);
+ if(handler===startLogin||handler===logout)must(sameOrigin(req,config.origin),'error.foreignSite',403);
+ if(handler===callback)must(/^[A-Za-z0-9_-]{32,128}$/.test(readCookie(req,'__Host-worlds-transaction')??''),'error.sessionExpired',400);
+ must(env.SESSION_PEPPER,'error.setup',503);
+ const ip=await hash((req.headers.get('CF-Connecting-IP')||'local')+env.SESSION_PEPPER);
+ if(env.READ_LIMIT)must((await env.READ_LIMIT.limit({key:ip})).success,'error.tooMany',429);
+ await limit(neon(env.DATABASE_URL),`worlds:${url.pathname}:${ip}`,12,600);
+ try{return await handler(req,config);}
+ catch{throw new AppError(503,'error.worldsUnavailable');}
 }
 async function isAdmin(req:Request,env:Env){
   const candidate=req.headers.get('Authorization')?.replace(/^Bearer /,'')||'';
@@ -74,7 +103,7 @@ const publicSong=(s:Record<string,any>)=>({id:s.id,title:s.title,artists:s.artis
 
 async function api(req:Request,env:Env){
   const u=new URL(req.url),path=u.pathname,method=req.method;
-  if(path==='/api/health')return json({ok:true,service:'music-worlds',database:!!env.DATABASE_URL,hubAuth:false,uploads:!!env.MEDIA,commit:env.APP_COMMIT||null});
+  if(path==='/api/health')return json({ok:true,service:'music-worlds',database:!!env.DATABASE_URL,hubAuth:hubConfigured(env),uploads:!!env.MEDIA,commit:env.APP_COMMIT||null});
   must(env.DATABASE_URL&&env.SESSION_PEPPER,'error.setup',503);
   const db=neon(env.DATABASE_URL);
   const ip=await hash((req.headers.get('CF-Connecting-IP')||'local')+env.SESSION_PEPPER);
@@ -86,6 +115,7 @@ async function api(req:Request,env:Env){
     await limit(db,`ip:${ip}`,90);
   }
   if(path==='/api/session'&&method==='POST'){
+    if(hasHubSession(req,env))return json(await identity(req,db,env));
     if(req.headers.get('Cookie')?.includes('__Host-mw=')){
       try{return json(await identity(req,db,env));}catch(e){if(!(e instanceof AppError)||e.status!==401)throw e;}
     }
@@ -94,6 +124,29 @@ async function api(req:Request,env:Env){
     await db.transaction([db`INSERT INTO profiles(id,name,theme,language) VALUES (${id},${input.name},${input.theme},${input.language})`,
       db`INSERT INTO sessions(token_hash,profile_id,expires_at) VALUES (${await hash(secret+env.SESSION_PEPPER)},${id},now()+interval '30 days')`]);
     const r=json({id,...input},201);r.headers.set('Set-Cookie',`__Host-mw=${secret}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`);return r;
+  }
+  if(path==='/api/worlds/status'&&method==='GET'){
+    const central=await hubSession(req,env);
+    const linked=central?await db`SELECT 1 FROM worlds_identity_links WHERE issuer=${central.issuer} AND subject=${central.sub}`:[];
+    return json({enabled:hubConfigured(env),authenticated:!!central,linked:linked.length>0,csrf:central?.csrf});
+  }
+  if(path==='/api/worlds/profile'&&method==='POST'){
+    if(!hubConfigured(env))throw new AppError(404,'error.functionNotFound');
+    const central=await hubSession(req,env);
+    const raw=readCookie(req,SESSION_COOKIE);
+    if(!central||!raw)throw new AppError(401,'error.sessionExpired');
+    const {csrf,...fields}=profileSchema.extend({csrf:z.string().max(128)}).parse(await body(req));
+    must(csrf===central.csrf,'error.foreignSite',403);
+    const id=crypto.randomUUID(),sessionKey=await authHash(raw);
+    const rows=await db`WITH created AS (
+      INSERT INTO profiles(id,name,theme,language)
+      SELECT ${id},${fields.name},${fields.theme},${fields.language} FROM worlds_auth_sessions
+      WHERE id=${sessionKey} AND issuer=${central.issuer} AND subject=${central.sub} AND expires>extract(epoch FROM now())*1000
+      RETURNING id
+    ) INSERT INTO worlds_identity_links(issuer,subject,local_profile_id)
+      SELECT ${central.issuer},${central.sub},id FROM created RETURNING local_profile_id`;
+    must(rows.length,'error.sessionExpired',401);
+    return json({id,...fields,source:'worlds'},201);
   }
   if(path==='/api/catalog'&&method==='GET'){
     const pool=await tasks(db),ids=pool.map(t=>t.id);
@@ -106,7 +159,7 @@ async function api(req:Request,env:Env){
   const me=await identity(req,db,env);
   if(path==='/api/me'&&method==='GET'){
     const stats=await db`SELECT COUNT(*)::int games,COALESCE(SUM(score),0)::int points,COALESCE(SUM(rounds),0)::int rounds,COUNT(*) FILTER(WHERE won)::int wins FROM results WHERE profile_id=${me.id}`;
-    return json({...me,stats:stats[0],hub:{enabled:false,url:env.HUB_ORIGIN},achievements:[...(stats[0].games?['first_session']:[]),...(stats[0].points>=10?['ten_titles']:[])]});
+    return json({...me,stats:stats[0],hub:{enabled:hubConfigured(env),url:env.HUB_ORIGIN},achievements:[...(stats[0].games?['first_session']:[]),...(stats[0].points>=10?['ten_titles']:[])]});
   }
   if(path==='/api/me'&&method==='PATCH'){
     const input=profileSchema.parse(await body(req));await db`UPDATE profiles SET name=${input.name},theme=${input.theme},language=${input.language} WHERE id=${me.id}`;return json(input);
@@ -118,6 +171,8 @@ async function api(req:Request,env:Env){
     for(const a of assets)await env.MEDIA!.delete(a.storage_key);
     // Delete rooms containing this identity or their contribution snapshots; no ghost names remain.
     await db.transaction([
+      ...(me.source==='worlds'?[db`DELETE FROM worlds_auth_sessions s USING worlds_identity_links l
+        WHERE l.local_profile_id=${me.id} AND s.issuer=l.issuer AND s.subject=l.subject`]:[]),
       db`DELETE FROM rooms WHERE state::text LIKE ${'%'+me.id+'%'} OR EXISTS(SELECT 1 FROM contributions c WHERE c.author_id=${me.id} AND rooms.state::text LIKE '%'||c.id::text||'%')`,
       db`DELETE FROM contribution_events WHERE contribution_id IN(SELECT id FROM contributions WHERE author_id=${me.id})`,
       db`DELETE FROM reports WHERE reporter_id=${me.id} OR contribution_id IN(SELECT id FROM contributions WHERE author_id=${me.id})`,
@@ -126,9 +181,12 @@ async function api(req:Request,env:Env){
       db`DELETE FROM songs WHERE NOT EXISTS(SELECT 1 FROM contribution_songs cs WHERE cs.song_id=songs.id)`,
       db`UPDATE contributions SET body='{}'::jsonb,status='withdrawn',review='{"status":"withdrawn","reason":"author deletion"}'::jsonb,author_id=NULL,revision=revision+1 WHERE author_id=${me.id}`,
       db`DELETE FROM profiles WHERE id=${me.id}`]);
-    const r=json({ok:true});r.headers.set('Set-Cookie','__Host-mw=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');return r;
+    const r=json({ok:true});
+    r.headers.set('Set-Cookie',cookie(me.source==='worlds'?SESSION_COOKIE:'__Host-mw','',0));
+    return r;
   }
   if(path==='/api/logout'&&method==='POST'){
+    if(me.source==='worlds')throw new AppError(400,'error.worldsLogout');
     const secret=/(?:^|;\s*)__Host-mw=([a-f0-9]{64})/.exec(req.headers.get('Cookie')||'')?.[1];
     if(secret)await db`DELETE FROM sessions WHERE token_hash=${await hash(secret+env.SESSION_PEPPER)}`;
     const r=json({ok:true});r.headers.set('Set-Cookie','__Host-mw=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0');return r;
@@ -245,7 +303,8 @@ export default {
     let r:Response;const path=new URL(req.url).pathname,indexing=env.PUBLIC_INDEXING==='true';
     const requestLocale=localeFrom(req.headers.get('X-MW-Language')||req.headers.get('Accept-Language'));
     try{
-      if(path.startsWith('/api/'))r=await api(req,env);
+      if(path.startsWith('/auth/'))r=await worldsAuth(req,env);
+      else if(path.startsWith('/api/'))r=await api(req,env);
       else if(path==='/robots.txt')r=new Response(indexing?`User-agent: *\nAllow: /$\nAllow: /en$\nDisallow: /api/\nSitemap: ${env.SITE_ORIGIN}/sitemap.xml\n`:'User-agent: *\nDisallow: /\n',{headers:{'Content-Type':'text/plain; charset=utf-8'}});
       else if(path==='/sitemap.xml')r=new Response(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">${indexing?`<url><loc>${env.SITE_ORIGIN}/</loc><xhtml:link rel="alternate" hreflang="de" href="${env.SITE_ORIGIN}/"/><xhtml:link rel="alternate" hreflang="en" href="${env.SITE_ORIGIN}/en"/></url><url><loc>${env.SITE_ORIGIN}/en</loc><xhtml:link rel="alternate" hreflang="de" href="${env.SITE_ORIGIN}/"/><xhtml:link rel="alternate" hreflang="en" href="${env.SITE_ORIGIN}/en"/></url>`:''}</urlset>`,{headers:{'Content-Type':'application/xml'}});
       else if(publicPages[path]){const template=await (await env.ASSETS.fetch(new Request(new URL('/',req.url),{method:'GET',headers:req.headers}))).text();r=new Response(seoHTML(template,path,env.SITE_ORIGIN,indexing),{headers:{'Content-Type':'text/html; charset=utf-8'}});}
@@ -265,6 +324,8 @@ export default {
     const db=neon(env.DATABASE_URL);await db.transaction([
       db`DELETE FROM rooms WHERE code IN(SELECT code FROM rooms WHERE expires_at<now() LIMIT 500)`,
       db`DELETE FROM sessions WHERE token_hash IN(SELECT token_hash FROM sessions WHERE expires_at<now() LIMIT 1000)`,
-      db`DELETE FROM rate_limits WHERE key IN(SELECT key FROM rate_limits WHERE expires_at<now() LIMIT 1000)`]);
+      db`DELETE FROM rate_limits WHERE key IN(SELECT key FROM rate_limits WHERE expires_at<now() LIMIT 1000)`,
+      ...(hubConfigured(env)?['worlds_auth_transactions','worlds_auth_sessions','worlds_auth_replays'].map(table=>
+       db.query(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} WHERE expires<extract(epoch FROM now())*1000 LIMIT 1000)`)):[])]);
   }
 };

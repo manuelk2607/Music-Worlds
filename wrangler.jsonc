@@ -1,7 +1,7 @@
 {
   "name": "music-worlds", "main": "src/worker.ts", "compatibility_date": "2026-10-19",
   "workers_dev": true,
-  "assets": {"directory": "public", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/", "/spiele", "/ueber", "/en", "/en/games", "/en/about", "/robots.txt", "/sitemap.xml"]},
+  "assets": {"directory": "public", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/auth/*", "/", "/spiele", "/ueber", "/en", "/en/games", "/en/about", "/robots.txt", "/sitemap.xml"]},
   "vars": {"SITE_ORIGIN": "https://music-worlds.maki26.workers.dev", "HUB_ORIGIN": "https://worlds-hub.maki26.workers.dev", "HUB_AUTH_ENABLED": "false", "PUBLIC_INDEXING":"true"},
   "ratelimits": [{"name":"READ_LIMIT","namespace_id":"260704","simple":{"limit":300,"period":60}}],
   "triggers": {"crons": ["17 3 * * *"]},

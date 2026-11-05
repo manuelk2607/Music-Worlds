@@ -1,4 +1,11 @@
 export const de={
+  'worlds.signIn':'Mit Worlds anmelden','worlds.create':'Worlds-Musikprofil anlegen',
+  'worlds.createText':'Dieses neue Musikprofil wird deinem Worlds-Konto zugeordnet. Dein Gastprofil bleibt separat.',
+  'worlds.active':'Deine Worlds-Anmeldung ist in Music-Worlds aktiv.',
+  'worlds.signOut':'Von Music-Worlds abmelden','worlds.signOutText':'Deine Sitzung in Music-Worlds wird beendet. Dein Musikprofil bleibt gespeichert.',
+  'error.worldsProfileRequired':'Lege zuerst ein Musikprofil für dein Worlds-Konto an.',
+  'error.worldsUnavailable':'Die Worlds-Anmeldung ist gerade nicht erreichbar.',
+  'error.worldsLogout':'Beende diese Worlds-Sitzung über die Profilseite.',
   'language.name':'Deutsch','language.switch':'Sprache','language.de':'DE','language.en':'EN',
   'nav.label':'Hauptnavigation','nav.home':'Music-Worlds Startseite','nav.play':'Spielen','nav.discover':'Entdecken','nav.contribute':'Beitragen','nav.profile':'Profil','nav.skip':'Zum Inhalt',
   'footer.tagline':'Musik verbindet. Spielen auch.','footer.rights':'Rechte & Datenschutz','footer.rules':'Spielregeln','footer.moderation':'Moderation',

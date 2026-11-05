@@ -1,5 +1,12 @@
 import type {MessageKey} from './de';
 export const en:Record<MessageKey,string>={
+  'worlds.signIn':'Sign in with Worlds','worlds.create':'Create Worlds music profile',
+  'worlds.createText':'This new music profile will be linked to your Worlds account. Your guest profile stays separate.',
+  'worlds.active':'Your Worlds sign-in is active in Music-Worlds.',
+  'worlds.signOut':'Sign out of Music-Worlds','worlds.signOutText':'Your Music-Worlds session will end. Your music profile will stay saved.',
+  'error.worldsProfileRequired':'Create a music profile for your Worlds account first.',
+  'error.worldsUnavailable':'Worlds sign-in is temporarily unavailable.',
+  'error.worldsLogout':'End this Worlds session from the profile page.',
   'language.name':'English','language.switch':'Language','language.de':'DE','language.en':'EN',
   'nav.label':'Main navigation','nav.home':'Music-Worlds home','nav.play':'Play','nav.discover':'Discover','nav.contribute':'Contribute','nav.profile':'Profile','nav.skip':'Skip to content',
   'footer.tagline':'Music connects us. Games do too.','footer.rights':'Rights & privacy','footer.rules':'Game rules','footer.moderation':'Moderation',

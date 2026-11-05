@@ -7,6 +7,7 @@ document.querySelector('.skip')?.addEventListener('click',event=>{event.preventD
 let me:Data|null=null,catalog:Data={songs:[],genres:[],available:0},own:Data[]=[],room:Data|null=null,adminToken='',editing:Data|null=null;
 let poll:ReturnType<typeof setTimeout>|undefined,pollErrors=0,offset=0,routeGeneration=0;
 let helpState={key:'',hintOpen:false,hintSeen:false,albumOpen:false};
+let worlds:{enabled:boolean;authenticated?:boolean;csrf?:string}={enabled:false};
 const storedLocale=localStorage.getItem('mw-language');
 let locale:Locale=storedLocale?localeFrom(storedLocale):(['/spiele','/ueber'].includes(location.pathname)?'de':location.pathname.startsWith('/en')?'en':localeFrom(navigator.languages?.[0]||navigator.language));
 const tr=(key:Parameters<typeof t>[1],values:Record<string,string|number>={})=>t(locale,key,values);
@@ -21,13 +22,32 @@ async function api(path:string,method='GET',data?:unknown,admin=false):Promise<a
 function buttons(html:string){return `<div class="actions">${html}</div>`;}
 function pageTitle(kicker:string,title:string,description:string){return `<div class="page-title"><div class="eyebrow">${kicker}</div><h1>${title}</h1><p>${description}</p></div>`;}
 function modal(title:string,content:string){dialog.innerHTML=`<button class="close ghost" data-close aria-label="${esc(tr('dialog.close'))}">×</button><h2>${esc(title)}</h2>${content}`;dialog.showModal();$('[data-close]',dialog).onclick=()=>dialog.close();}
+async function signInWithWorlds(){
+ const next=localePath('/',locale)+'#profil';
+ const response=await fetch('/auth/login?'+new URLSearchParams({next,ui_locales:locale}),
+  {method:'POST',headers:{Accept:'application/json','X-MW-Language':locale}});
+ if(!response.ok)throw new Error(tr('error.worldsUnavailable'));
+ const {url}=await response.json() as {url:string};
+ const target=new URL(url);
+ if(target.protocol!=='https:')throw new Error(tr('error.worldsUnavailable'));
+ location.assign(target.href);
+}
+async function signOutOfWorlds(){
+ const response=await fetch('/auth/logout?locale='+locale,{method:'POST',body:new URLSearchParams({csrf:worlds.csrf??''})});
+ if(!response.ok)throw new Error(tr('error.worldsUnavailable'));
+ localStorage.removeItem('mw-room');
+ location.assign(localePath('/',locale)+'#profil');
+ location.reload();
+}
 async function ensureMe():Promise<boolean>{
   if(me)return true;
   return new Promise(resolve=>{
-    modal(tr('session.title'),`<p>${tr('session.text')}</p><form id="name-form"><label>${tr('session.name')}<input name="name" maxlength="40" required autocomplete="nickname" placeholder="${tr('session.placeholder')}"></label><button class="primary">${tr('session.start')}</button><p class="minor">${tr('session.noPassword')} <a href="#rechte">${tr('session.privacy')}</a></p></form>`);
+    const central=!!worlds.authenticated;
+    modal(tr(central?'worlds.create':'session.title'),`<p>${tr(central?'worlds.createText':'session.text')}</p><form id="name-form"><label>${tr('session.name')}<input name="name" maxlength="40" required autocomplete="nickname" placeholder="${tr('session.placeholder')}"></label><button class="primary">${tr(central?'worlds.create':'session.start')}</button><p class="minor">${tr('session.noPassword')} <a href="#rechte">${tr('session.privacy')}</a></p></form>`);
     dialog.addEventListener('close',()=>resolve(!!me),{once:true});
     $('#name-form',dialog).onsubmit=async e=>{e.preventDefault();const name=String(new FormData(e.target as HTMLFormElement).get('name'));
-      await run(async()=>{me=await api('/session','POST',{name,theme:'dark',language:locale});dialog.close();});};
+      await run(async()=>{me=await api(central?'/worlds/profile':'/session','POST',
+       {name,theme:'dark',language:locale,...(central?{csrf:worlds.csrf}:{})});dialog.close();});};
   });
 }
 async function run(fn:()=>Promise<unknown>){try{await fn();}catch(e){const message=(e as Error).message;notice(isMessageKey(message)?tr(message):message);}}
@@ -94,15 +114,34 @@ function renderContribution(){
   if(editing)$('#cancel-edit').onclick=()=>{editing=null;renderContribution();};
 }
 async function profile(){
-  if(!me){main.innerHTML=pageTitle(tr('profile.kicker'),tr('profile.guestTitle'),tr('profile.guestText'))+`<button class="primary" id="begin">${tr('contribute.createProfile')}</button>`;$('#begin').onclick=()=>run(async()=>{if(await ensureMe())await profile();});return;}
+  if(!me){
+    const central=!!worlds.authenticated;
+    main.innerHTML=pageTitle(tr('profile.kicker'),tr(central?'worlds.create':'profile.guestTitle'),tr(central?'worlds.createText':'profile.guestText'))+
+     buttons(`<button class="primary" id="begin">${tr(central?'worlds.create':'contribute.createProfile')}</button>
+      ${worlds.enabled?`<button class="ghost" id="worlds-action">${tr(central?'worlds.signOut':'worlds.signIn')}</button>`:''}`);
+    $('#begin').onclick=()=>run(async()=>{if(await ensureMe())await profile();});
+    if(worlds.enabled)$('#worlds-action').onclick=()=>run(central?signOutOfWorlds:signInWithWorlds);
+    return;
+  }
   me=await api('/me');document.documentElement.dataset.theme=me!.theme;
   const board=await api('/leaderboard'),s=me!.stats;
   const stats:[[string,unknown],[string,unknown],[string,unknown],[string,unknown]]=[[tr('profile.points'),formatNumber(locale,s.points)],[tr('profile.games'),formatNumber(locale,s.games)],[tr('profile.wins'),formatNumber(locale,s.wins)],[tr('profile.correct'),s.rounds?formatNumber(locale,s.points/s.rounds,{style:'percent',maximumFractionDigits:0}):'–']];
   main.innerHTML=pageTitle(tr('profile.kicker'),tr('profile.hello',{name:esc(me!.name)}),tr('profile.text'))+`<div class="stats">${stats.map(([l,v])=>`<div class="panel"><div class="stat">${v}</div><p>${l}</p></div>`).join('')}</div><div class="split"><div class="panel"><h3>${tr('profile.board')}</h3>${board.players.length?board.players.map((p:Data,i:number)=>`<div class="leader"><span>${formatNumber(locale,i+1)}. &nbsp; ${esc(p.name)}<br><small>${formatNumber(locale,p.games)} ${tr(p.games===1?'profile.gameOne':'profile.gameMany')}</small></span><b>${formatNumber(locale,p.points)} ${tr(p.points===1?'profile.pointOne':'profile.pointMany')}</b></div>`).join(''):`<p>${tr('profile.first')}</p>`}</div><aside><form class="panel" id="profile-form"><h3>${tr('profile.settings')}</h3>${field(tr('session.name'),'name',me!.name,'required maxlength="40"')}<label>${tr('profile.appearance')}<select name="theme"><option value="dark">${tr('profile.dark')}</option><option value="light" ${me!.theme==='light'?'selected':''}>${tr('profile.light')}</option></select></label><label>${tr('profile.language')}<select name="language"><option value="de" ${locale==='de'?'selected':''}>Deutsch (DE)</option><option value="en" ${locale==='en'?'selected':''}>English (EN)</option></select></label><button class="primary">${tr('common.save')}</button></form><div class="panel"><h3>${tr('profile.achievements')}</h3>${me!.achievements.length?me!.achievements.map((a:string)=>`<span class="pill green">✦ ${tr(a==='first_session'?'achievement.first_session':'achievement.ten_titles')}</span>`).join(''):`<p>${tr('profile.noAchievement')}</p>`}</div><div class="info"><b>${tr('profile.hubTitle')}</b><br>${tr('profile.hubText')}</div><button id="logout" class="ghost danger">${tr('profile.logout')}</button></aside></div>`;
   $('#profile-form').onsubmit=e=>{e.preventDefault();const d=new FormData(e.target as HTMLFormElement);void run(async()=>{const next=localeFrom(d.get('language'));if(next!==locale)await selectLanguage(next);me=await api('/me','PATCH',{name:d.get('name'),theme:d.get('theme'),language:next});await profile();notice(tr('profile.saved'));});};
   const deleteButton=document.createElement('button');deleteButton.className='ghost danger';deleteButton.textContent=tr('profile.delete');$('#logout').after(deleteButton);
+  if(worlds.enabled){
+   const hubInfo=main.querySelector('aside .info');
+   if(me!.source==='worlds'){
+    if(hubInfo)hubInfo.textContent=tr('worlds.active');
+    $('#logout').textContent=tr('worlds.signOut');
+   }else if(hubInfo){
+    const button=document.createElement('button');
+    button.className='ghost';button.textContent=tr('worlds.signIn');button.onclick=()=>run(signInWithWorlds);
+    hubInfo.replaceChildren(button);
+   }
+  }
   deleteButton.onclick=()=>{modal(tr('profile.deleteTitle'),`<p>${tr('profile.deleteText')}</p><form id="delete-profile"><label>${tr('profile.deleteConfirm')}<input name="confirm" pattern="DELETE" required autocomplete="off"></label><button class="danger">${tr('profile.deleteButton')}</button></form>`);$('#delete-profile').onsubmit=e=>{e.preventDefault();void run(async()=>{await api('/me','DELETE',{confirm:new FormData(e.target as HTMLFormElement).get('confirm')});me=null;room=null;localStorage.removeItem('mw-room');dialog.close();location.hash='spielen';notice(tr('profile.deleted'));});};};
-  $('#logout').onclick=()=>{modal(tr('profile.logoutTitle'),`<p>${tr('profile.logoutText')}</p><button id="confirm-logout" class="danger">${tr('profile.logout')}</button>`);$('#confirm-logout').onclick=()=>run(async()=>{await api('/logout','POST',{});me=null;room=null;localStorage.removeItem('mw-room');dialog.close();location.hash='spielen';});};
+  $('#logout').onclick=()=>{const central=me?.source==='worlds';modal(tr(central?'worlds.signOut':'profile.logoutTitle'),`<p>${tr(central?'worlds.signOutText':'profile.logoutText')}</p><button id="confirm-logout" class="danger">${tr(central?'worlds.signOut':'profile.logout')}</button>`);$('#confirm-logout').onclick=()=>run(async()=>{if(central){await signOutOfWorlds();return;}await api('/logout','POST',{});me=null;room=null;localStorage.removeItem('mw-room');dialog.close();location.hash='spielen';});};
 }
 function playerList(){return `<ul class="players">${room!.players.map((p:Data)=>`<li><span class="avatar">${esc(p.name[0].toUpperCase())}</span><span>${esc(p.name)} ${p.id===me!.id?`(${tr('room.you')})`:''}${p.id===room!.host?' ♛':''}</span><b>${formatNumber(locale,p.score)}</b></li>`).join('')}</ul>`;}
 async function action(action:string,extra:Data={}){
@@ -189,4 +228,6 @@ async function route(){
 window.addEventListener('hashchange',()=>{window.scrollTo({top:0});void route();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&room)void run(()=>refreshRoom());});
 document.querySelectorAll<HTMLButtonElement>('[data-language]').forEach(button=>button.onclick=()=>run(()=>selectLanguage(localeFrom(button.dataset.language))));
-void (async()=>{localStorage.setItem('mw-language',locale);if(location.pathname==='/'&&locale==='en')history.replaceState(null,'','/en'+location.hash);shell();try{me=await api('/me');document.documentElement.dataset.theme=me!.theme;if(me!.language&&me!.language!==locale){locale=localeFrom(me!.language);localStorage.setItem('mw-language',locale);history.replaceState(null,'',localePath(location.pathname,locale)+location.hash);shell();}}catch{}await route();})();
+void (async()=>{localStorage.setItem('mw-language',locale);if(location.pathname==='/'&&locale==='en')history.replaceState(null,'','/en'+location.hash);shell();
+ try{worlds=await api('/worlds/status');}catch{/* Guest mode remains available when Worlds is disabled. */}
+ try{me=await api('/me');document.documentElement.dataset.theme=me!.theme;if(me!.language&&me!.language!==locale){locale=localeFrom(me!.language);localStorage.setItem('mw-language',locale);history.replaceState(null,'',localePath(location.pathname,locale)+location.hash);shell();}}catch{}await route();})();

@@ -1,0 +1,17 @@
+{
+  "name": "@worlds-hub/auth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./oidc.ts",
+    "./store": "./store.ts",
+    "./linking": "./linking.ts",
+    "./postgres-links": "./postgres-links.ts",
+    "./postgres-store": "./postgres-store.ts"
+  },
+  "dependencies": {
+    "oauth4webapi": "^3.8.8",
+    "jose": "^6.2.15"
+  }
+}
