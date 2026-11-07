@@ -3,6 +3,14 @@
 Stand: 04.11.2026, Europe/Stockholm. Ziel: eigenständige Musikspielplattform unter https://music-worlds.maki26.workers.dev/ und https://github.com/manuelk2607/Music-Worlds.
 
 ## Erledigt
+
+Nachprüfung 07.11.2026. Der bestehende SSO-Featurebranch verwendet den
+gemeinsamen OIDC-Client 0.1.1 mit `max_age=300` und prüft den signierten
+Anmeldezeitpunkt. Der Hub-QA-Anbieter bestätigte den Codeflow für aktuelle
+und ältere Sitzungen mit positivem Zeitfenster. 22 Tests, Typprüfung,
+Lint und Build samt Worker-Trockenlauf bestanden. Die echte Music-Abnahme
+mit Gastverknüpfung und Rücknahme ist vor der Aktivierung erforderlich.
+
 - Sprachumschaltung DE/EN vollständig ergänzt: zentrale getrennte Kataloge, Browsererkennung mit DE-Fallback, dauerhafte lokale und profilgebundene Auswahl, mobiler barrierefreier Schalter sowie Zustands-/Raumerhalt. Navigation, Auth/Profile, Beiträge, Spiel/Lobby, Dialoge, Meldungen und Serverfehler sind lokalisiert; Datum, Zeit, Zahlen und Prozente verwenden `Intl`. Nutzergenerierte Inhalte bleiben unverändert und erhalten, soweit bekannt, ein eigenes `lang`-Attribut.
 - Lokalisierte öffentliche Pfade und SEO umgesetzt: DE `/`, `/spiele`, `/ueber`; EN `/en`, `/en/games`, `/en/about`; Canonical, `hreflang`, `lang`, Open Graph und JSON-LD konsistent. Nur `/` und `/en` als äquivalente Landingpage-Varianten indexierbar, alle weiteren Seiten noindex. Explizites `language`-Profilfeld und Hub-Vertrag für spätere zentrale Präferenz vorbereitet; keine Cookie-Freigabe zwischen Anwendungen.
 - Sprachrelease lokal geprüft: 22 Unit-Tests, 73 isolierte PostgreSQL-Assertions, Typprüfung, ESLint, Build und npm-Audit (0 Schwachstellen) erfolgreich. Browserprüfung in DE/EN einschließlich Navigation, Profil, Beitragsformular, unverändertem Nutzerinhalt und 390×844-Mobilansicht bestanden.
