@@ -6,7 +6,7 @@ import { publicPages,seoHTML,indexablePage } from './seo';
 import { validateUpload,type PrivateStorage,type MediaPurpose } from './media';
 import {isMessageKey,localeFrom,t,type Locale} from './i18n';
 import type {MessageKey} from './i18n/de';
-import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_COOKIE,startLogin} from '@worlds-hub/auth';
+import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_COOKIE,startLogin,startLoginLink} from '@worlds-hub/auth';
 import {hash as authHash} from '@worlds-hub/auth/store';
 import {guestLinkEnabled,hasHubSession,hubConfig,hubConfigured,hubSession} from './worlds-auth';
 
@@ -50,13 +50,14 @@ async function worldsAuth(req:Request,env:Env){
  const config=hubConfig(env);
  if(!config)throw new AppError(404,'error.functionNotFound');
  const url=new URL(req.url);
- const routes={'/auth/login':startLogin,'/auth/callback':callback,'/auth/logout':logout,'/auth/backchannel-logout':backchannelLogout} as const;
+ const routes={'/auth/login':startLogin,'/auth/start':startLoginLink,'/auth/callback':callback,'/auth/logout':logout,'/auth/backchannel-logout':backchannelLogout} as const;
  const handler=Object.hasOwn(routes,url.pathname)?routes[url.pathname as keyof typeof routes]:undefined;
  if(!handler)throw new AppError(404,'error.functionNotFound');
  must(url.origin===config.origin,'error.foreignSite',403);
- must(req.method===(handler===callback?'GET':'POST'),'error.functionNotFound',405);
+ must(req.method===(handler===callback||handler===startLoginLink?'GET':'POST'),'error.functionNotFound',405);
  if(handler===startLogin||handler===logout)must(sameOrigin(req,config.origin),'error.foreignSite',403);
  if(handler===callback)must(/^[A-Za-z0-9_-]{32,128}$/.test(readCookie(req,'__Host-worlds-transaction')??''),'error.sessionExpired',400);
+ if(handler===startLoginLink)must(req.headers.get('sec-fetch-mode')==='navigate'&&req.headers.get('sec-fetch-dest')==='document','error.foreignSite',403);
  must(env.SESSION_PEPPER,'error.setup',503);
  const ip=await hash((req.headers.get('CF-Connecting-IP')||'local')+env.SESSION_PEPPER);
  if(env.READ_LIMIT)must((await env.READ_LIMIT.limit({key:ip})).success,'error.tooMany',429);

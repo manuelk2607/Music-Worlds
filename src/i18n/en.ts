@@ -1,5 +1,7 @@
 import type {MessageKey} from './de';
 export const en:Record<MessageKey,string>={
+  'worlds.signInTitle':'Your music. Your Worlds account.',
+  'worlds.signInText':'Sign in through Worlds Hub. Existing music profiles and their data are preserved during migration.',
   'worlds.signIn':'Sign in with Worlds','worlds.create':'Create Worlds music profile',
   'worlds.createText':'This new music profile will be linked to your Worlds account. Your guest profile stays separate.',
   'worlds.active':'Your Worlds sign-in is active in Music-Worlds.',

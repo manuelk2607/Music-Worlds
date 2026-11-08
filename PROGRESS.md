@@ -1,5 +1,29 @@
 # Music-Worlds — Fortschritt
 
+
+## Zentrale Anmeldelinks – 08.11.2026
+
+Im aktivierten Worlds-Modus führen Profil-/Anmeldeaktionen direkt über
+`/auth/start` zur zentralen Anmeldung. Es gibt dabei kein neues lokales
+Namens-/Passwortformular; gültige bestehende Gastprofile bleiben verwendbar.
+Die Profiltexte unterscheiden Worlds-Anmeldung und lokale Gastverwaltung in
+DE/EN. Links verwenden die bestehenden Schaltflächenstile. Gemeinsamer Client
+0.1.3 ist mit Subtree-Provenienz und Dateiprüfsummen vendort. PKCE, Serverlimits,
+Redirect-Allowlist, Sprache und hostgebundene Transaktion bleiben erhalten.
+
+23 Tests, Typprüfung, Lint, Build und Worker-Trockenlauf bestanden. Chromium und
+WebKit prüften beide Sprachen bei 320/1280 px mit lokalen Testantworten: direkte
+Links, lokalisierte Profiltexte, Touch-Größe, Sprachwechsel und kein zusätzliches
+lokales Anmeldeformular. Reale Providerabnahme bleibt offen. Produktionsflag
+`HUB_AUTH_ENABLED=false` unverändert; kein Deployment/Account-Cutover ausgelöst.
+
+Produktion read-only: 2 Profile, eines mit aktiver Sitzung, 16 Beiträge und null
+Ergebnisse. Reserviertes `hub_subject` ist bei keinem Profil gesetzt; produktive
+Mapping-Tabellen fehlen. Keine lokale ID, Sitzung, Rolle oder Inhaltsbeziehung
+geändert. Offene Aufgaben: sichere bestehende Gast-/Worlds-Zuordnung ohne
+Namens-/E-Mail-Automerge, echte Migration/Rücknahme, vollständige Dokumentansicht
+bei Providerfehlern und projektübergreifender Logout.
+
 Stand: 04.11.2026, Europe/Stockholm. Ziel: eigenständige Musikspielplattform unter https://music-worlds.maki26.workers.dev/ und https://github.com/manuelk2607/Music-Worlds.
 
 ## Erledigt

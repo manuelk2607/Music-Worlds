@@ -1,4 +1,6 @@
 export const de={
+  'worlds.signInTitle':'Deine Musik. Dein Worlds-Konto.',
+  'worlds.signInText':'Melde dich über Worlds Hub an. Bestehende Musikprofile und ihre Daten bleiben während der Übernahme erhalten.',
   'worlds.signIn':'Mit Worlds anmelden','worlds.create':'Worlds-Musikprofil anlegen',
   'worlds.createText':'Dieses neue Musikprofil wird deinem Worlds-Konto zugeordnet. Dein Gastprofil bleibt separat.',
   'worlds.active':'Deine Worlds-Anmeldung ist in Music-Worlds aktiv.',
