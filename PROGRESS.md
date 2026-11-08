@@ -14,7 +14,8 @@ Redirect-Allowlist, Sprache und hostgebundene Transaktion bleiben erhalten.
 23 Tests, Typprüfung, Lint, Build und Worker-Trockenlauf bestanden. Chromium und
 WebKit prüften beide Sprachen bei 320/1280 px mit lokalen Testantworten: direkte
 Links, lokalisierte Profiltexte, Touch-Größe, Sprachwechsel und kein zusätzliches
-lokales Anmeldeformular. Reale Providerabnahme bleibt offen. Produktionsflag
+lokales Anmeldeformular. Reale Providerabnahme bleibt offen. GitHub-Lauf `42514848840` für `01e95bd` vollständig erfolgreich, einschließlich
+bestehender isolierter Datenbankintegration und Produktionsaudit. Produktionsflag
 `HUB_AUTH_ENABLED=false` unverändert; kein Deployment/Account-Cutover ausgelöst.
 
 Produktion read-only: 2 Profile, eines mit aktiver Sitzung, 16 Beiträge und null
