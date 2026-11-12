@@ -2,6 +2,22 @@
 
 ## Produktive Worlds-Anmeldung – 12.11.2026
 
+**Live seit 11:26 UTC.** Commit `48af04e` läuft als Cloudflare-Version
+`637db59b-e68e-4085-971a-c1f9dc951068`. GitHub **43209000635** bestand
+23 Unit-Tests, 87 Prüfungen mit dem vorhandenen QA-PostgreSQL, die
+OIDC- und Gastprofilprüfung, Migrationen 005–007 und den Live-Smoke.
+Der öffentliche Worker meldet `hubAuth: true`. Der Startlink antwortet
+mit der registrierten Callback-Adresse, PKCE S256 und hostgebundenem
+Cookie. Der authentifizierte Browser-Callback wartet auf Bestätigung.
+Nach dem Release weiterhin zwei Profile, eine aktive Gastsitzung,
+16 Beiträge und null Ergebnisse. Die drei Prüfsummen stimmen überein.
+Es wurden noch keine bestehenden Music-Profile verknüpft.
+
+Der erste Lauf **43208753639** stoppte vor der Produktionsmigration,
+weil der QA-Zugang die Pooler-Adresse desselben Endpunkts verwendete.
+Der Test normalisiert diese Adresse und prüft anschließend exakt
+Endpunkt und Datenbankname.
+
 Der vorhandene Release-Workflow kann den registrierten produktiven OAuth-
 Client freischalten. Vor dem Deployment prüft er den Anmeldeablauf und die
 Gastübernahme mit der bestehenden QA-Datenbank. Ein gültiges Gastprofil
