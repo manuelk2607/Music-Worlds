@@ -7,6 +7,10 @@ on:
         description: Deploy to the existing music-worlds Worker after checks
         type: boolean
         default: false
+      worlds_auth:
+        description: Verify Worlds login and enable it on the existing Worker if deploying
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -29,6 +33,11 @@ jobs:
           TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
           CONFIRM_ISOLATED_TEST_DATABASE: '1'
         run: if [ -n "$TEST_DATABASE_URL" ]; then npm run test:integration; fi
+      - name: Verify Worlds login and profile continuity on the existing QA database
+        if: inputs.worlds_auth
+        env:
+          TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+        run: npx --no-install tsx scripts/integration-worlds.ts
       - name: Apply additive migrations to Music-Worlds only
         if: inputs.deploy
         env:
@@ -40,7 +49,20 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: 'false'
-        run: npx wrangler deploy --env='' --var APP_COMMIT:${GITHUB_SHA}
+          WORLDS_AUTH: ${{ inputs.worlds_auth }}
+        run: |
+          args=(--var "APP_COMMIT:${GITHUB_SHA}")
+          if [ "$WORLDS_AUTH" = true ]; then
+            args+=(
+              --var HUB_AUTH_ENABLED:true
+              --var HUB_OIDC_ISSUER:https://ep-bold-boat-batl101c.neonauth.c-8.eu-central-1.aws.neon.tech/worlds_identity/auth
+              --var HUB_OIDC_CLIENT_ID:CxxmMJaWneXdwCQNckMcEOxWGvDnczVp
+              --var HUB_OIDC_RESOURCE:https://music-worlds.maki26.workers.dev/api
+            )
+          fi
+          npx wrangler deploy --env='' "${args[@]}"
       - name: Production smoke
         if: inputs.deploy
+        env:
+          EXPECT_WORLDS_AUTH: ${{ inputs.worlds_auth }}
         run: npm run smoke

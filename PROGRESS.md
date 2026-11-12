@@ -1,5 +1,23 @@
 # Music-Worlds — Fortschritt
 
+## Produktive Worlds-Anmeldung – 12.11.2026
+
+Der vorhandene Release-Workflow kann den registrierten produktiven OAuth-
+Client freischalten. Vor dem Deployment prüft er den Anmeldeablauf und die
+Gastübernahme mit der bestehenden QA-Datenbank. Ein gültiges Gastprofil
+im selben Browser sperrt die Neuanlage eines zweiten Musikprofils. Die
+bisherige Gastsitzung bleibt nutzbar. Die produktive Verknüpfung wird nach
+der echten Callback-Abnahme separat aktiviert.
+
+Cloudflare-Ausgangsversion `b8ec5cbf` hatte 100 Prozent Traffic.
+Neon-Ausgangspunkt am 12.11.2026 um 11:22:54 UTC, WAL-Position `0/1EB5F68`,
+innerhalb des sechs Stunden langen Wiederherstellungsfensters. Vor dem
+Release zwei Profile, eine aktive Gastsitzung, 16 Beiträge, null Ergebnisse
+und keine Mapping-Tabelle. Prüfsummen für Profile, Beiträge und Ergebnisse
+wurden für den Nachvergleich erfasst. Bei einem Rücknahmebedarf die
+Cloudflare-Ausgangsversion aktivieren. Die additiven Tabellen enthalten
+keine Änderungen an den bisherigen Profilen oder Beiträgen.
+
 ## Zentrale Abmeldung – 12.11.2026
 
 Der Worlds-Client 0.1.5 akzeptiert signierte Sitzungswiderrufe vom Hub. Migration

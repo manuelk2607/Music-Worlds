@@ -38,6 +38,9 @@ async function identity(req:Request,db:DB,env:Env):Promise<Identity>{
     if(!profile)throw new AppError(403,'error.worldsProfileRequired');
     return {...profile,source:'worlds'} as Identity;
   }
+  return guestIdentity(req,db,env);
+}
+async function guestIdentity(req:Request,db:DB,env:Env):Promise<Identity>{
   const value=guestCookie(req);
   must(value,'error.playerRequired',401);
   const key=await hash(value!+env.SESSION_PEPPER);
@@ -50,6 +53,11 @@ async function identity(req:Request,db:DB,env:Env):Promise<Identity>{
     :await db`SELECT p.id,p.name,p.theme,p.language FROM sessions s JOIN profiles p ON p.id=s.profile_id
       WHERE s.token_hash=${key} AND s.expires_at>now()`;
   must(rows[0],'error.sessionExpired',401);return rows[0] as Identity;
+}
+async function hasActiveGuest(req:Request,db:DB,env:Env){
+  if(!guestCookie(req))return false;
+  try{await guestIdentity(req,db,env);return true;}
+  catch(error){if(error instanceof AppError&&error.status===401)return false;throw error;}
 }
 async function limit(db:DB,key:string,max:number,seconds=60){
   const rows=await db`INSERT INTO rate_limits(key,count,expires_at) VALUES (${key},1,now()+${seconds}*interval '1 second') ON CONFLICT(key) DO UPDATE SET count=CASE WHEN rate_limits.expires_at<now() THEN 1 ELSE rate_limits.count+1 END,expires_at=CASE WHEN rate_limits.expires_at<now() THEN excluded.expires_at ELSE rate_limits.expires_at END RETURNING count`;
@@ -162,8 +170,9 @@ async function api(req:Request,env:Env){
   if(path==='/api/worlds/status'&&method==='GET'){
     const central=await hubSession(req,env);
     const linked=central?await db`SELECT 1 FROM worlds_identity_links WHERE issuer=${central.issuer} AND subject=${central.sub}`:[];
+    const existingGuest=!!central&&!linked.length&&await hasActiveGuest(req,db,env);
     return json({enabled:hubConfigured(env),authenticated:!!central,linked:linked.length>0,csrf:central?.csrf,
-      guestLink:guestLinkEnabled(env)&&!!central&&!linked.length&&!!guestCookie(req)});
+      existingGuest,guestLink:guestLinkEnabled(env)&&existingGuest});
   }
   if(path==='/api/worlds/link/prepare'||path==='/api/worlds/link/confirm'){
     if(!guestLinkEnabled(env))throw new AppError(404,'error.functionNotFound');
@@ -220,6 +229,7 @@ async function api(req:Request,env:Env){
     if(!central||!raw)throw new AppError(401,'error.sessionExpired');
     const {csrf,...fields}=profileSchema.extend({csrf:z.string().max(128)}).parse(await body(req));
     must(csrf===central.csrf,'error.foreignSite',403);
+    must(!await hasActiveGuest(req,db,env),'worlds.existingGuestText',409);
     const id=crypto.randomUUID(),sessionKey=await authHash(raw);
     const rows=await db`WITH created AS (
       INSERT INTO profiles(id,name,theme,language)

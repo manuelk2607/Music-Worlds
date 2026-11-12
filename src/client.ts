@@ -7,7 +7,7 @@ document.querySelector('.skip')?.addEventListener('click',event=>{event.preventD
 let me:Data|null=null,catalog:Data={songs:[],genres:[],available:0},own:Data[]=[],room:Data|null=null,adminToken='',editing:Data|null=null;
 let poll:ReturnType<typeof setTimeout>|undefined,pollErrors=0,offset=0,routeGeneration=0;
 let helpState={key:'',hintOpen:false,hintSeen:false,albumOpen:false};
-let worlds:{enabled:boolean;authenticated?:boolean;csrf?:string;guestLink?:boolean}={enabled:false};
+let worlds:{enabled:boolean;authenticated?:boolean;csrf?:string;guestLink?:boolean;existingGuest?:boolean}={enabled:false};
 const storedLocale=localStorage.getItem('mw-language');
 let locale:Locale=storedLocale?localeFrom(storedLocale):(['/spiele','/ueber'].includes(location.pathname)?'de':location.pathname.startsWith('/en')?'en':localeFrom(navigator.languages?.[0]||navigator.language));
 const tr=(key:Parameters<typeof t>[1],values:Record<string,string|number>={})=>t(locale,key,values);
@@ -49,6 +49,7 @@ async function signOutOfWorlds(){
 async function ensureMe():Promise<boolean>{
   if(me)return true;
   if(worlds.enabled&&!worlds.authenticated){location.assign(worldsLoginHref());return false;}
+  if(worlds.existingGuest){location.hash='profil';return false;}
   return new Promise(resolve=>{
     const central=!!worlds.authenticated;
     modal(tr(central?'worlds.create':'session.title'),`<p>${tr(central?'worlds.createText':'session.text')}</p><form id="name-form"><label>${tr('session.name')}<input name="name" maxlength="40" required autocomplete="nickname" placeholder="${tr('session.placeholder')}"></label><button class="primary">${tr(central?'worlds.create':'session.start')}</button><p class="minor">${tr('session.noPassword')} <a href="#rechte">${tr('session.privacy')}</a></p></form>`);
@@ -124,12 +125,13 @@ function renderContribution(){
 async function profile(){
   if(!me){
     const central=!!worlds.authenticated;
-    main.innerHTML=pageTitle(tr('profile.kicker'),tr(central?'worlds.create':worlds.enabled?'worlds.signInTitle':'profile.guestTitle'),tr(central?'worlds.createText':worlds.enabled?'worlds.signInText':'profile.guestText'))+
-     buttons(`${worlds.enabled&&!central?`<a class="button primary" id="begin" href="${worldsLoginHref()}">${tr('worlds.signIn')}</a>`:`<button class="primary" id="begin">${tr(central?'worlds.create':'contribute.createProfile')}</button>`}
+    const existing=worlds.existingGuest===true;
+    main.innerHTML=pageTitle(tr('profile.kicker'),tr(existing?'worlds.existingGuestTitle':central?'worlds.create':worlds.enabled?'worlds.signInTitle':'profile.guestTitle'),tr(existing?'worlds.existingGuestText':central?'worlds.createText':worlds.enabled?'worlds.signInText':'profile.guestText'))+
+     buttons(`${existing?'':worlds.enabled&&!central?`<a class="button primary" id="begin" href="${worldsLoginHref()}">${tr('worlds.signIn')}</a>`:`<button class="primary" id="begin">${tr(central?'worlds.create':'contribute.createProfile')}</button>`}
       ${worlds.enabled&&central?`<button class="ghost" id="worlds-action">${tr('worlds.signOut')}</button>`:''}
       ${worlds.guestLink?`<button class="ghost" id="review-guest">${tr('worlds.reviewGuest')}</button>
        <button class="ghost" id="renew-worlds">${tr('worlds.renew')}</button>`:''}`);
-    if(!worlds.enabled||central)$('#begin').onclick=()=>run(async()=>{if(await ensureMe())await profile();});
+    if(!existing&&(!worlds.enabled||central))$('#begin').onclick=()=>run(async()=>{if(await ensureMe())await profile();});
     if(worlds.enabled&&central)$('#worlds-action').onclick=()=>run(signOutOfWorlds);
     if(worlds.guestLink){
      $('#review-guest').onclick=()=>run(reviewGuestProfile);

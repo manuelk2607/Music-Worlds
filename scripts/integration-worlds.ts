@@ -76,10 +76,12 @@ try{
  assert.equal(finish.headers.get('location'),'/en#profil');
  const centralCookie=cookie(finish,'__Host-worlds-session'),both=centralCookie+'; '+guestCookie;
  assert.equal((await call('/api/me',{cookie:both})).status,403);
- const status=await (await call('/api/worlds/status',{cookie:both})).json() as {authenticated:boolean;linked:boolean;csrf:string};
+ const status=await (await call('/api/worlds/status',{cookie:both})).json() as {authenticated:boolean;linked:boolean;existingGuest:boolean;csrf:string};
  assert.equal(status.authenticated,true);assert.equal(status.linked,false);
- const create=(csrf:string)=>call('/api/worlds/profile',{method:'POST',cookie:both,json:{csrf,name:profileName,theme:'light',language:'en'}});
+ assert.equal(status.existingGuest,true);
+ const create=(csrf:string,credentials=centralCookie)=>call('/api/worlds/profile',{method:'POST',cookie:credentials,json:{csrf,name:profileName,theme:'light',language:'en'}});
  assert.equal((await create('incorrect')).status,403);
+ assert.equal((await create(status.csrf,both)).status,409);
  assert.deepEqual((await Promise.all([create(status.csrf),create(status.csrf)])).map(r=>r.status).sort(),[201,409]);
  assert.equal((await db`SELECT count(*)::int AS n FROM profiles WHERE name=${profileName}`)[0]?.n,1);
  const me=await (await call('/api/me',{cookie:both})).json() as {id:string;language:string;source:string};
@@ -101,8 +103,8 @@ try{
  const linkBinding=cookie(fresh,'__Host-worlds-transaction');
  transactions.push(digest(linkBinding.split('=')[1]));
  authorization=new URL((await fresh.json() as {url:string}).url);
- assert.equal(authorization.searchParams.get('max_age'),'0');
- assert.equal(authorization.searchParams.get('prompt'),'login');
+ assert.equal(authorization.searchParams.get('max_age'),'300');
+ assert.equal(authorization.searchParams.has('prompt'),false);
  const verified=await call('/auth/callback?'+new URLSearchParams({code:'link-fixture',state:authorization.searchParams.get('state')!}),{cookie:linkBinding},linkEnv);
  assert.equal(verified.status,303);
  const linkCookie=cookie(verified,'__Host-worlds-session');
