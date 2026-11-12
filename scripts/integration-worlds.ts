@@ -6,7 +6,9 @@ import worker,{type Env} from '../src/worker';
 import {migrate} from './migrate';
 
 const connection=new URL(process.env.TEST_DATABASE_URL!);
+connection.hostname=connection.hostname.replace(/-pooler\./,'.');
 assert.equal(connection.hostname,'ep-raspy-meadow-b94kfjkq.c-7.eu-central-1.aws.neon.tech','Use only the isolated qa-initial branch');
+assert.equal(connection.pathname,'/neondb','Use only the Music-Worlds QA database');
 await migrate(connection.href);
 const db=neon(connection.href);
 const origin='https://music.example.invalid',issuer='https://music-issuer.example.invalid',client='music-test';
