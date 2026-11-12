@@ -1,6 +1,6 @@
 {
   "name": "@worlds-hub/auth",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,7 +8,8 @@
     "./store": "./store.ts",
     "./linking": "./linking.ts",
     "./postgres-links": "./postgres-links.ts",
-    "./postgres-store": "./postgres-store.ts"
+    "./postgres-store": "./postgres-store.ts",
+    "./session-revocation": "./session-revocation.ts"
   },
   "dependencies": {
     "oauth4webapi": "^3.8.8",

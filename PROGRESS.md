@@ -1,5 +1,19 @@
 # Music-Worlds — Fortschritt
 
+## Zentrale Abmeldung – 12.11.2026
+
+Der Worlds-Client 0.1.5 akzeptiert signierte Sitzungswiderrufe vom Hub. Migration
+007 beendet die bisherigen Worlds- und Gast-Sitzungen des verknüpften Profils.
+Auch eine erst nach dem Widerruf gespeicherte Zuordnung beendet das alte
+Gast-Token. Beiträge und Profil-IDs bleiben erhalten. Eine neuere zentrale
+Anmeldung und Sitzungen anderer Profile funktionieren weiterhin.
+
+23 lokale Tests, Typprüfung, Lint und Worker-Trockenlauf bestanden. Migration
+007 wurde in lokalem Postgres zweimal mit dem bestehenden Migrationsformat
+angewendet und mit der eingeschränkten Worker-Rolle geprüft. Der Test gegen
+den separaten QA-Datenbankzweig läuft über den GitHub-Prüfworkflow.
+Für eine Abnahme sind Migration 007 und der öffentliche
+`WORLDS_HUB_SESSION_EVENT_JWK` erforderlich. Produktionsaktivierung steht aus.
 
 ## Zentrale Anmeldelinks – 08.11.2026
 

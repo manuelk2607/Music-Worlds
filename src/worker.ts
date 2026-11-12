@@ -8,9 +8,10 @@ import {isMessageKey,localeFrom,t,type Locale} from './i18n';
 import type {MessageKey} from './i18n/de';
 import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_COOKIE,startLogin,startLoginLink} from '@worlds-hub/auth';
 import {hash as authHash} from '@worlds-hub/auth/store';
-import {guestLinkEnabled,hasHubSession,hubConfig,hubConfigured,hubSession} from './worlds-auth';
+import {guestLinkEnabled,hasHubSession,hubConfig,hubConfigured,hubSession,hubSessionEvent,hubSessionEventKey} from './worlds-auth';
+import {sessionRevocationPath} from '@worlds-hub/auth/session-revocation';
 
-export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_GUEST_LINK_ENABLED?:string;HUB_REAUTH_VERIFIED?:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
+export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_GUEST_LINK_ENABLED?:string;HUB_REAUTH_VERIFIED?:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;WORLDS_HUB_SESSION_EVENT_JWK?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
 type DB=NeonQueryFunction<false,false>;
 type Identity={id:string;name:string;theme:string;language:Locale;source?:'worlds'};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
@@ -39,7 +40,15 @@ async function identity(req:Request,db:DB,env:Env):Promise<Identity>{
   }
   const value=guestCookie(req);
   must(value,'error.playerRequired',401);
-  const rows=await db`SELECT p.id,p.name,p.theme,p.language FROM sessions s JOIN profiles p ON p.id=s.profile_id WHERE s.token_hash=${await hash(value!+env.SESSION_PEPPER)} AND s.expires_at>now()`;
+  const key=await hash(value!+env.SESSION_PEPPER);
+  const rows=hubConfigured(env)&&hubSessionEventKey(env)
+    ?await db`SELECT p.id,p.name,p.theme,p.language FROM sessions s JOIN profiles p ON p.id=s.profile_id
+      WHERE s.token_hash=${key} AND s.expires_at>now() AND NOT EXISTS (
+        SELECT 1 FROM worlds_identity_links l JOIN worlds_session_revocations r USING(issuer,subject)
+        WHERE l.local_profile_id=s.profile_id AND l.issuer=${env.HUB_OIDC_ISSUER}
+      )`
+    :await db`SELECT p.id,p.name,p.theme,p.language FROM sessions s JOIN profiles p ON p.id=s.profile_id
+      WHERE s.token_hash=${key} AND s.expires_at>now()`;
   must(rows[0],'error.sessionExpired',401);return rows[0] as Identity;
 }
 async function limit(db:DB,key:string,max:number,seconds=60){
@@ -50,6 +59,7 @@ async function worldsAuth(req:Request,env:Env){
  const config=hubConfig(env);
  if(!config)throw new AppError(404,'error.functionNotFound');
  const url=new URL(req.url);
+ if(url.pathname===sessionRevocationPath)return hubSessionEvent(req,config,env);
  const routes={'/auth/login':startLogin,'/auth/start':startLoginLink,'/auth/callback':callback,'/auth/logout':logout,'/auth/backchannel-logout':backchannelLogout} as const;
  const handler=Object.hasOwn(routes,url.pathname)?routes[url.pathname as keyof typeof routes]:undefined;
  if(!handler)throw new AppError(404,'error.functionNotFound');

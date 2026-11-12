@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {neon} from '@neondatabase/serverless';
+import {SESSION_COOKIE,token} from '@worlds-hub/auth';
+import {hash} from '@worlds-hub/auth/store';
+import {sessionEventContentType,sessionRevocationPath,signSessionRevocation} from '@worlds-hub/auth/session-revocation';
 import worker,{type Env} from '../src/worker';
+import {hubConfig} from '../src/worlds-auth';
 import {seedContributions} from '../src/seed-data';
 import {migrate} from './migrate';
 import {seed} from './seed';
@@ -22,6 +26,45 @@ async function request(c:Client|null,path:string,method='GET',data?:unknown,admi
 const eq=(actual:unknown,expected:unknown)=>{assert.deepEqual(actual,expected);checks++;};
 async function newClient(name:string,language:'de'|'en'='de'){const client={cookie:'',id:'',language};const r=await request(client,'/session','POST',{name,theme:'dark',language});eq(r.status,201);return {cookie:r.cookie,id:r.body.id,language};}
 let a:Client,b:Client,c:Client;
+async function checkCentralSignOut(linked:Client,unrelated:Client){
+  const pair=await crypto.subtle.generateKey('Ed25519',true,['sign','verify']);
+  const {kty,crv,x}=await crypto.subtle.exportKey('jwk',pair.publicKey);
+  const kid='integration-test',issuer='https://identity.test',subject=token(),cutoff=Math.floor(Date.now()/1000)*1000;
+  const settings:Env={...env,HUB_AUTH_ENABLED:'true',HUB_OIDC_ISSUER:issuer,HUB_OIDC_CLIENT_ID:'music-fixture',
+    WORLDS_HUB_SESSION_EVENT_JWK:JSON.stringify({kid,kty,crv,x})};
+  const {store}=hubConfig(settings)!;
+  const audience=origin+sessionRevocationPath;
+  const event={eventId:token(),identityIssuer:issuer,subject,revokedThrough:cutoff};
+  const deliver=(body:string)=>worker.fetch(new Request(audience,{method:'POST',headers:{'Content-Type':sessionEventContentType},body}),settings);
+  const me=(cookie:string)=>worker.fetch(new Request(origin+'/api/me',{headers:{cookie}}),settings);
+  const oldToken=token(),freshToken=token(),oldKey=await hash(oldToken),freshKey=await hash(freshToken);
+  const session={issuer,sub:subject,csrf:token(),expires:Date.now()+60_000};
+  try{
+    await sql`INSERT INTO worlds_identity_links(issuer,subject,local_profile_id) VALUES(${issuer},${subject},${linked.id})`;
+    await store.putSession(oldKey,{...session,authenticatedAt:cutoff-1000});
+    eq((await me(SESSION_COOKIE+'='+oldToken)).status,200);
+    eq((await deliver(await signSessionRevocation(event,'https://wrong.test',audience,{kid,privateKey:pair.privateKey}))).status,400);
+    eq((await me(linked.cookie)).status,200);
+    const signed=await signSessionRevocation(event,'https://worlds-hub.maki26.workers.dev',audience,{kid,privateKey:pair.privateKey});
+    eq((await deliver(signed)).status,202);
+    eq((await deliver(signed)).status,202);
+    eq((await me(SESSION_COOKIE+'='+oldToken)).status,401);
+    eq((await me(linked.cookie)).status,401);
+    eq((await me(unrelated.cookie)).status,200);
+    eq((await sql`SELECT COUNT(*)::int n FROM sessions WHERE profile_id=${linked.id}`)[0].n,0);
+    await store.putSession(freshKey,{...session,authenticatedAt:cutoff+1000});
+    const fresh=await me(SESSION_COOKIE+'='+freshToken);
+    eq(fresh.status,200);
+    eq((await fresh.json() as {id:string}).id,linked.id);
+    eq((await deliver(signed)).status,202);
+    eq((await me(SESSION_COOKIE+'='+freshToken)).status,200);
+  }finally{
+    await store.deleteSession(oldKey);
+    await store.deleteSession(freshKey);
+    await sql`DELETE FROM worlds_identity_links WHERE issuer=${issuer} AND subject=${subject}`;
+    await sql`DELETE FROM worlds_session_revocations WHERE issuer=${issuer} AND subject=${subject}`;
+  }
+}
 try{
   a=await newClient('Integration A','en');b=await newClient('Integration B');c=await newClient('Integration C');
   eq((await request(a,'/me')).body.id,a.id);eq((await request(a,'/me')).body.language,'en');eq((await request(null,'/me')).status,401);
@@ -93,7 +136,10 @@ try{
   eq(adminAfterDeletion.reports.some((report:any)=>report.contribution_id===contributionId),false);
   eq(adminAfterDeletion.contributions.every((entry:any)=>!!entry.body.song?.title),true);
   eq((await sql`SELECT count(*)::int n FROM songs WHERE title=${input.song.title}`)[0].n,0);
-  console.log(`${checks} integration assertions passed: real isolated PostgreSQL, bilingual profile/error persistence, concurrent votes/edits, moderation, rights, reports, deletion, reload and localized SEO.`);
+  const linked=await newClient('Integration Worlds');
+  try{await checkCentralSignOut(linked,b);}
+  finally{await sql`DELETE FROM profiles WHERE id=${linked.id}`;}
+  console.log(`${checks} integration assertions passed: real isolated PostgreSQL, bilingual profile/error persistence, concurrent votes/edits, moderation, rights, reports, deletion, reload, localized SEO and signed central sign-out.`);
 }finally{
   for(const client of [a!,b!,c!].filter(Boolean)){try{await request(client,'/me','DELETE',{confirm:'DELETE'});}catch{}}
 }
