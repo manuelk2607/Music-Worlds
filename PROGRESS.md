@@ -8,7 +8,10 @@
 OIDC- und Gastprofilprüfung, Migrationen 005–007 und den Live-Smoke.
 Der öffentliche Worker meldet `hubAuth: true`. Der Startlink antwortet
 mit der registrierten Callback-Adresse, PKCE S256 und hostgebundenem
-Cookie. Der authentifizierte Browser-Callback wartet auf Bestätigung.
+Cookie. Am 15.11. bestätigte der Kontoinhaber den echten Rücksprung zu
+„Dein bisheriges Musikprofil“. Die Produktionsdatenbank meldete eine
+aktive Worlds-Sitzung, zwei Musikprofile und null Zuordnungen. Die
+Oberfläche erkennt die bisherige Gastsitzung und bietet kein Duplikat an.
 Nach dem Release weiterhin zwei Profile, eine aktive Gastsitzung,
 16 Beiträge und null Ergebnisse. Die drei Prüfsummen stimmen überein.
 Es wurden noch keine bestehenden Music-Profile verknüpft.
