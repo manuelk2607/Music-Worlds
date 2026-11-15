@@ -1,5 +1,19 @@
 # Music-Worlds — Fortschritt
 
+## Übernahme eines bestehenden Gastprofils vorbereitet
+
+Der geprüfte Übergang ist auf genau eine zentrale Identität und genau
+eine vorhandene Musikprofil-UUID begrenzbar. Beide Sitzungen sind für
+die erneute Anmeldung, Vorschau und ausdrückliche Bestätigung erforderlich.
+Fehlende oder ungültige Freigabe schließt die Übernahme. Das vorab
+ausgewählte Worlds-Konto kann auch ohne Gastcookie kein zweites Profil anlegen.
+
+23 Unit-Tests, Typprüfung, Lint und Worker-Trockenlauf bestanden.
+Der isolierte PostgreSQL-Test bestätigte den Erhalt von Profil-UUID,
+Punkten und Sprache sowie die Ablehnung anderer Kontopaare, abgelaufener
+Nachweise und doppelter Bestätigung. Produktionsfreigabe für das einzelne
+Profil und Browser-Abnahme stehen aus. Die bestehende Migration 006 genügt.
+
 ## Produktive Worlds-Anmeldung – 12.11.2026
 
 **Live seit 11:26 UTC.** Commit `48af04e` läuft als Cloudflare-Version

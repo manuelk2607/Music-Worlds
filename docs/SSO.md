@@ -6,9 +6,29 @@ Der zweistufige Ablauf zeigt das Worlds-Konto und das bisherige Music-Profil vor
 
 Die Gastsitzung bleibt für einen Rückfall auf den bisherigen Anmeldeweg nutzbar. Eine ausdrückliche Abmeldung von Music-Worlds widerruft die zentrale Sitzung und eine gleichzeitig vorgelegte Gastsitzung desselben Profils atomar. Eine Gastsitzung eines anderen Profils bleibt verfügbar.
 
-Die Route benötigt `HUB_GUEST_LINK_ENABLED=true` und `HUB_REAUTH_VERIFIED=true` zusätzlich zur Worlds-Konfiguration. Die Freigabe setzt einen nachgewiesenen frischen `auth_time` vom echten Anbieter voraus. Migration 006 wurde ausschließlich auf `qa-initial` angewendet. Ihre Prüfsumme ist `7ef9af7e3a0c24786d7170df520ddfc09c11c823654be3591d2c8956ce8e3ad1`. Die Wartung entfernt höchstens 500 abgelaufene Nachweise pro Durchlauf.
+Die Route benötigt `HUB_GUEST_LINK_ENABLED=true`, `HUB_REAUTH_VERIFIED=true` und das Worker-Secret `HUB_GUEST_LINK_TARGET` mit genau einem `subject` des konfigurierten Issuers und einer lokalen `profileId`. Die beiden Sitzungen müssen dieses Paar auch bei Vorschau und Bestätigung nachweisen. Für den Zielaccount bleibt die Neuanlage eines separaten Profils gesperrt, auch wenn der Gastcookie fehlt. Ein fehlendes oder ungültiges Secret schließt die Übernahme. Migration 006 ist bereits in Produktion installiert. Ihre Prüfsumme ist `7ef9af7e3a0c24786d7170df520ddfc09c11c823654be3591d2c8956ce8e3ad1`.
 
 Der Test mit signiertem OIDC-Fixture und isoliertem Neon prüfte die Umschaltung, CSRF, abgelaufene Nachweise, den Wechsel des Gastkontos und zwei gleichzeitige Bestätigungen. Genau eine Bestätigung war erfolgreich. UUID, gespeicherte Punkte und Sprache blieben erhalten. Der Test prüfte außerdem den Rückfall bei deaktiviertem SSO und den gezielten Sitzungswiderruf. Der Bestätigungsdialog wurde auf Deutsch und Englisch mit lokalen Testantworten im Browser geprüft.
+
+### Freigabe und Rücknahme für ein bestehendes Profil
+
+Vor dem Upload die aktuelle Worker-Version sowie den Wiederherstellungspunkt
+der bestehenden Music-Worlds-Datenbank festhalten. Die Zielkennung nach
+Zustimmung intern prüfen und in einer nur für den Prozess lesbaren Datei
+als einziges Secret für `wrangler deploy --secrets-file` übergeben.
+Der Inhalt folgt dem Format
+`{"HUB_GUEST_LINK_TARGET":"{\"subject\":\"<Worlds-ID>\",\"profileId\":\"<Musikprofil-UUID>\"}"}`.
+Die Datei direkt nach dem Aufruf entfernen. Den produktiven Music-Issuer,
+Client und Resource explizit aus dem vorhandenen Release übernehmen und
+beide Übernahmeschalter setzen. Der Schritt benötigt keine DB-Migration.
+
+Im Browser erneut bei Worlds bestätigen, beide angezeigten Konten prüfen
+und die Verknüpfung bewusst bestätigen. Danach mit derselben Profil-UUID
+Zugriff, Beiträge, Spielergebnisse und Sprache prüfen. Bei Bedarf die
+vorherige Worker-Version als Rollback aktivieren. Sie schließt die
+Übernahme, kann eine bestätigte Zuordnung aber weiterhin lesen. Das
+Rücksetzen des Workers ändert keine Zuordnungen in PostgreSQL.
+[Cloudflare Worker Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
 
 ## Anmeldung und neues Musikprofil vom 05.11.2026
 

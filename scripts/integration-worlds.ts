@@ -67,6 +67,8 @@ try{
  assert.equal(guest.status,201);
  const guestCookie=cookie(guest,'__Host-mw');
  const guestId=(await guest.json() as {id:string}).id;
+ const linkEnv={...env,HUB_GUEST_LINK_ENABLED:'true',HUB_REAUTH_VERIFIED:'true',
+  HUB_GUEST_LINK_TARGET:JSON.stringify({subject:linkSubject,profileId:guestId})};
  const begin=await call('/auth/login?next=%2Fen%23profil&ui_locales=en',{method:'POST',cookie:guestCookie});
  assert.equal(begin.status,200);
  const binding=cookie(begin,'__Host-worlds-transaction');
@@ -81,7 +83,11 @@ try{
  const status=await (await call('/api/worlds/status',{cookie:both})).json() as {authenticated:boolean;linked:boolean;existingGuest:boolean;csrf:string};
  assert.equal(status.authenticated,true);assert.equal(status.linked,false);
  assert.equal(status.existingGuest,true);
- const create=(csrf:string,credentials=centralCookie)=>call('/api/worlds/profile',{method:'POST',cookie:credentials,json:{csrf,name:profileName,theme:'light',language:'en'}});
+ const wrongSubject=await (await call('/api/worlds/status',{cookie:both},linkEnv)).json() as {guestLink:boolean};
+ assert.equal(wrongSubject.guestLink,false);
+ assert.equal((await call('/api/worlds/link/prepare',{method:'POST',cookie:both,json:{csrf:status.csrf}},linkEnv)).status,404);
+ assert.equal((await call('/auth/login?reauth=1',{method:'POST',cookie:both},linkEnv)).status,404);
+ const create=(csrf:string,credentials=centralCookie,config=env)=>call('/api/worlds/profile',{method:'POST',cookie:credentials,json:{csrf,name:profileName,theme:'light',language:'en'}},config);
  assert.equal((await create('incorrect')).status,403);
  assert.equal((await create(status.csrf,both)).status,409);
  assert.deepEqual((await Promise.all([create(status.csrf),create(status.csrf)])).map(r=>r.status).sort(),[201,409]);
@@ -99,25 +105,35 @@ try{
  await db`INSERT INTO results(match_id,profile_id,score,rounds,won) VALUES (${randomUUID()},${guestId},7,9,true)`;
  tokenSubject=linkSubject;
  authTime=Math.floor(Date.now()/1000);
- const linkEnv={...env,HUB_GUEST_LINK_ENABLED:'true',HUB_REAUTH_VERIFIED:'true'};
- const fresh=await call('/auth/login?reauth=1&next=%2Fen%23profil',{method:'POST',cookie:guestCookie},linkEnv);
- assert.equal(fresh.status,200);
- const linkBinding=cookie(fresh,'__Host-worlds-transaction');
- transactions.push(digest(linkBinding.split('=')[1]));
- authorization=new URL((await fresh.json() as {url:string}).url);
- assert.equal(authorization.searchParams.get('max_age'),'300');
- assert.equal(authorization.searchParams.has('prompt'),false);
- const verified=await call('/auth/callback?'+new URLSearchParams({code:'link-fixture',state:authorization.searchParams.get('state')!}),{cookie:linkBinding},linkEnv);
- assert.equal(verified.status,303);
- const linkCookie=cookie(verified,'__Host-worlds-session');
+ const signInForLink=async(reauth:boolean,credentials:string)=>{
+  const started=await call('/auth/login?next=%2Fen%23profil'+(reauth?'&reauth=1':''),{method:'POST',cookie:credentials},linkEnv);
+  assert.equal(started.status,200);
+  const binding=cookie(started,'__Host-worlds-transaction');
+  transactions.push(digest(binding.split('=')[1]));
+  authorization=new URL((await started.json() as {url:string}).url);
+  assert.equal(authorization.searchParams.get('max_age'),reauth?'300':null);
+  assert.equal(authorization.searchParams.has('prompt'),false);
+  const returned=await call('/auth/callback?'+new URLSearchParams({code:'link-fixture',state:authorization.searchParams.get('state')!}),{cookie:binding},linkEnv);
+  assert.equal(returned.status,303);
+  return cookie(returned,'__Host-worlds-session');
+ };
+ const firstCookie=await signInForLink(false,guestCookie);
+ const linkCookie=await signInForLink(true,firstCookie+'; '+guestCookie);
  linkSessionKey=digest(linkCookie.split('=')[1]);
  const credentials=linkCookie+'; '+guestCookie;
  const linkStatus=await (await call('/api/worlds/status',{cookie:credentials},linkEnv)).json() as {csrf:string;guestLink:boolean};
  assert.equal(linkStatus.guestLink,true);
+ const anotherGuest=linkCookie+'; '+otherGuestCookie;
+ const ineligible=await (await call('/api/worlds/status',{cookie:anotherGuest},linkEnv)).json() as {guestLink:boolean};
+ assert.equal(ineligible.guestLink,false);
+ assert.equal((await call('/auth/login?reauth=1',{method:'POST',cookie:anotherGuest},linkEnv)).status,404);
+ assert.equal((await create(linkStatus.csrf,linkCookie,linkEnv)).status,409);
  const link=(step:string,data:Record<string,unknown>,selected=credentials,config=linkEnv)=>call('/api/worlds/link/'+step,{method:'POST',cookie:selected,json:data},config);
  assert.equal((await link('prepare',{csrf:linkStatus.csrf},credentials,{...linkEnv,HUB_REAUTH_VERIFIED:'false'})).status,404);
+ assert.equal((await link('prepare',{csrf:linkStatus.csrf},credentials,{...linkEnv,HUB_GUEST_LINK_TARGET:'invalid'})).status,404);
  assert.equal((await link('prepare',{csrf:'invalid'})).status,403);
  assert.equal((await link('prepare',{csrf:linkStatus.csrf,profileId:otherGuestId})).status,400);
+ assert.equal((await link('prepare',{csrf:linkStatus.csrf},anotherGuest)).status,409);
  await db`UPDATE worlds_auth_sessions SET payload=jsonb_set(payload,'{authenticatedAt}',to_jsonb(${Date.now()-301_000}::bigint)) WHERE id=${linkSessionKey}`;
  assert.equal((await link('prepare',{csrf:linkStatus.csrf})).status,403);
  await db`UPDATE worlds_auth_sessions SET payload=jsonb_set(payload,'{authenticatedAt}',to_jsonb(${authTime*1000}::bigint)) WHERE id=${linkSessionKey}`;
@@ -140,7 +156,7 @@ try{
  assert.ok(ended.headers.getSetCookie().some(value=>value.startsWith('__Host-mw=;')));
  assert.equal((await call('/api/me',{cookie:guestCookie},linkEnv)).status,401);
  assert.equal((await call('/api/me',{cookie:otherGuestCookie},linkEnv)).status,200);
- console.log('PASS: isolated Music OIDC and guest linking preserve UUID, results and language. Wrong/stale proofs, switched profiles and duplicate confirmations are rejected.');
+ console.log('PASS: scoped Music guest linking preserves UUID, results and language. Unapproved account pairs, stale proofs and duplicate confirmations are rejected.');
 }finally{
  globalThis.fetch=originalFetch;
  await db.transaction([

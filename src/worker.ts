@@ -8,10 +8,10 @@ import {isMessageKey,localeFrom,t,type Locale} from './i18n';
 import type {MessageKey} from './i18n/de';
 import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_COOKIE,startLogin,startLoginLink} from '@worlds-hub/auth';
 import {hash as authHash} from '@worlds-hub/auth/store';
-import {guestLinkEnabled,hasHubSession,hubConfig,hubConfigured,hubSession,hubSessionEvent,hubSessionEventKey} from './worlds-auth';
+import {guestLinkTarget,hasHubSession,hubConfig,hubConfigured,hubSession,hubSessionEvent,hubSessionEventKey} from './worlds-auth';
 import {sessionRevocationPath} from '@worlds-hub/auth/session-revocation';
 
-export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_GUEST_LINK_ENABLED?:string;HUB_REAUTH_VERIFIED?:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;WORLDS_HUB_SESSION_EVENT_JWK?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
+export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_GUEST_LINK_ENABLED?:string;HUB_REAUTH_VERIFIED?:string;HUB_GUEST_LINK_TARGET?:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;WORLDS_HUB_SESSION_EVENT_JWK?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
 type DB=NeonQueryFunction<false,false>;
 type Identity={id:string;name:string;theme:string;language:Locale;source?:'worlds'};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
@@ -54,10 +54,10 @@ async function guestIdentity(req:Request,db:DB,env:Env):Promise<Identity>{
       WHERE s.token_hash=${key} AND s.expires_at>now()`;
   must(rows[0],'error.sessionExpired',401);return rows[0] as Identity;
 }
-async function hasActiveGuest(req:Request,db:DB,env:Env){
-  if(!guestCookie(req))return false;
-  try{await guestIdentity(req,db,env);return true;}
-  catch(error){if(error instanceof AppError&&error.status===401)return false;throw error;}
+async function activeGuest(req:Request,db:DB,env:Env){
+  if(!guestCookie(req))return null;
+  try{return await guestIdentity(req,db,env);}
+  catch(error){if(error instanceof AppError&&error.status===401)return null;throw error;}
 }
 async function limit(db:DB,key:string,max:number,seconds=60){
   const rows=await db`INSERT INTO rate_limits(key,count,expires_at) VALUES (${key},1,now()+${seconds}*interval '1 second') ON CONFLICT(key) DO UPDATE SET count=CASE WHEN rate_limits.expires_at<now() THEN 1 ELSE rate_limits.count+1 END,expires_at=CASE WHEN rate_limits.expires_at<now() THEN excluded.expires_at ELSE rate_limits.expires_at END RETURNING count`;
@@ -79,7 +79,14 @@ async function worldsAuth(req:Request,env:Env){
  must(env.SESSION_PEPPER,'error.setup',503);
  const ip=await hash((req.headers.get('CF-Connecting-IP')||'local')+env.SESSION_PEPPER);
  if(env.READ_LIMIT)must((await env.READ_LIMIT.limit({key:ip})).success,'error.tooMany',429);
- await limit(neon(env.DATABASE_URL),`worlds:${url.pathname}:${ip}`,12,600);
+ const db=neon(env.DATABASE_URL);
+ await limit(db,`worlds:${url.pathname}:${ip}`,12,600);
+ if((handler===startLogin||handler===startLoginLink)&&url.searchParams.get('reauth')==='1'){
+  const target=guestLinkTarget(env);
+  const central=target&&await hubSession(req,env);
+  must(target&&central?.sub===target.subject&&(await activeGuest(req,db,env))?.id===target.profileId,
+   'error.functionNotFound',404);
+ }
  try{
   let guestRevoked=false;
   const guest=handler===logout?guestCookie(req):undefined;
@@ -170,16 +177,19 @@ async function api(req:Request,env:Env){
   if(path==='/api/worlds/status'&&method==='GET'){
     const central=await hubSession(req,env);
     const linked=central?await db`SELECT 1 FROM worlds_identity_links WHERE issuer=${central.issuer} AND subject=${central.sub}`:[];
-    const existingGuest=!!central&&!linked.length&&await hasActiveGuest(req,db,env);
+    const guest=central&&!linked.length?await activeGuest(req,db,env):null;
+    const target=guestLinkTarget(env);
     return json({enabled:hubConfigured(env),authenticated:!!central,linked:linked.length>0,csrf:central?.csrf,
-      existingGuest,guestLink:guestLinkEnabled(env)&&existingGuest});
+      existingGuest:!!guest,guestLink:!!target&&central?.sub===target.subject&&guest?.id===target.profileId});
   }
   if(path==='/api/worlds/link/prepare'||path==='/api/worlds/link/confirm'){
-    if(!guestLinkEnabled(env))throw new AppError(404,'error.functionNotFound');
+    const target=guestLinkTarget(env);
+    if(!target)throw new AppError(404,'error.functionNotFound');
     must(method==='POST','error.functionNotFound',405);
     const central=await hubSession(req,env);
     const raw=readCookie(req,SESSION_COOKIE),guest=guestCookie(req);
     if(!central||!raw)throw new AppError(401,'error.sessionExpired');
+    must(central.sub===target.subject,'error.functionNotFound',404);
     const prepare=path.endsWith('/prepare');
     const schema=z.object({csrf:z.string().max(128)}).strict();
     const input=prepare?schema.parse(await body(req)):schema.extend({proof:z.string().regex(/^[a-f0-9]{64}$/)}).parse(await body(req));
@@ -201,6 +211,7 @@ async function api(req:Request,env:Env){
         FROM worlds_auth_sessions c CROSS JOIN sessions g
         WHERE c.id=${centralKey} AND c.issuer=${central.issuer} AND c.subject=${central.sub}
           AND c.expires>extract(epoch FROM now())*1000 AND g.token_hash=${guestKey} AND g.expires_at>now()
+          AND g.profile_id=${target.profileId}::uuid
           AND NOT EXISTS(SELECT 1 FROM worlds_identity_links l
             WHERE (l.issuer=c.issuer AND l.subject=c.subject) OR l.local_profile_id=g.profile_id)
         RETURNING local_profile_id
@@ -214,7 +225,7 @@ async function api(req:Request,env:Env){
       DELETE FROM worlds_guest_link_proofs p USING worlds_auth_sessions c,sessions g
       WHERE p.proof_hash=${await authHash(proof)} AND p.central_session_id=c.id AND p.guest_session_hash=g.token_hash
         AND c.id=${centralKey} AND c.issuer=${central.issuer} AND c.subject=${central.sub}
-        AND g.token_hash=${guestKey} AND g.profile_id=p.local_profile_id
+        AND g.token_hash=${guestKey} AND g.profile_id=p.local_profile_id AND g.profile_id=${target.profileId}::uuid
         AND p.expires_at>now() AND g.expires_at>now() AND c.expires>extract(epoch FROM now())*1000
       RETURNING p.local_profile_id
     ) INSERT INTO worlds_identity_links(issuer,subject,local_profile_id)
@@ -229,7 +240,7 @@ async function api(req:Request,env:Env){
     if(!central||!raw)throw new AppError(401,'error.sessionExpired');
     const {csrf,...fields}=profileSchema.extend({csrf:z.string().max(128)}).parse(await body(req));
     must(csrf===central.csrf,'error.foreignSite',403);
-    must(!await hasActiveGuest(req,db,env),'worlds.existingGuestText',409);
+    must(guestLinkTarget(env)?.subject!==central.sub&&!await activeGuest(req,db,env),'worlds.existingGuestText',409);
     const id=crypto.randomUUID(),sessionKey=await authHash(raw);
     const rows=await db`WITH created AS (
       INSERT INTO profiles(id,name,theme,language)
