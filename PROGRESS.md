@@ -7,6 +7,9 @@ eine vorhandene Musikprofil-UUID begrenzbar. Beide Sitzungen sind für
 die erneute Anmeldung, Vorschau und ausdrückliche Bestätigung erforderlich.
 Fehlende oder ungültige Freigabe schließt die Übernahme. Das vorab
 ausgewählte Worlds-Konto kann auch ohne Gastcookie kein zweites Profil anlegen.
+Die Profilansicht verweist dann auf den Browser mit der bisherigen Sitzung.
+Chromium am DE-Desktop (1440 px) und WebKit mobil auf EN (320 px) haben
+beide Ansichten geprüft.
 
 23 Unit-Tests, Typprüfung, Lint und Worker-Trockenlauf bestanden.
 Der isolierte PostgreSQL-Test bestätigte den Erhalt von Profil-UUID,

@@ -6,6 +6,7 @@ export const en:Record<MessageKey,string>={
   'worlds.createText':'This new music profile will be linked to your Worlds account.',
   'worlds.existingGuestTitle':'Your existing music profile',
   'worlds.existingGuestText':'You already have a guest profile in this browser. Link it when migration is available. Until then, you can sign out of Worlds here and keep using your guest profile.',
+  'worlds.findGuest':'Open Music-Worlds in the browser where your existing guest profile is active. You can link that profile to your Worlds account there.',
   'worlds.active':'Your Worlds sign-in is active in Music-Worlds.',
   'worlds.reviewGuest':'Review existing guest profile',
   'worlds.confirmGuest':'Link this guest profile',

@@ -124,8 +124,11 @@ try{
  const linkStatus=await (await call('/api/worlds/status',{cookie:credentials},linkEnv)).json() as {csrf:string;guestLink:boolean};
  assert.equal(linkStatus.guestLink,true);
  const anotherGuest=linkCookie+'; '+otherGuestCookie;
- const ineligible=await (await call('/api/worlds/status',{cookie:anotherGuest},linkEnv)).json() as {guestLink:boolean};
+ const ineligible=await (await call('/api/worlds/status',{cookie:anotherGuest},linkEnv)).json() as {guestLink:boolean;guestMigrationPending:boolean};
  assert.equal(ineligible.guestLink,false);
+ assert.equal(ineligible.guestMigrationPending,true);
+ const noGuest=await (await call('/api/worlds/status',{cookie:linkCookie},linkEnv)).json() as {existingGuest:boolean;guestLink:boolean;guestMigrationPending:boolean};
+ assert.deepEqual([noGuest.existingGuest,noGuest.guestLink,noGuest.guestMigrationPending],[false,false,true]);
  assert.equal((await call('/auth/login?reauth=1',{method:'POST',cookie:anotherGuest},linkEnv)).status,404);
  assert.equal((await create(linkStatus.csrf,linkCookie,linkEnv)).status,409);
  const link=(step:string,data:Record<string,unknown>,selected=credentials,config=linkEnv)=>call('/api/worlds/link/'+step,{method:'POST',cookie:selected,json:data},config);

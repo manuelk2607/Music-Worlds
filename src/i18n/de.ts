@@ -5,6 +5,7 @@ export const de={
   'worlds.createText':'Dieses neue Musikprofil wird deinem Worlds-Konto zugeordnet.',
   'worlds.existingGuestTitle':'Dein bisheriges Musikprofil',
   'worlds.existingGuestText':'Du hast in diesem Browser bereits ein Gastprofil. Verknüpfe es, sobald die Übernahme verfügbar ist. Bis dahin kannst du dich hier von Worlds abmelden und dein Gastprofil weiter nutzen.',
+  'worlds.findGuest':'Öffne Music-Worlds in dem Browser, in dem dein bisheriges Gastprofil aktiv ist. Dort kannst du es mit deinem Worlds-Konto verbinden.',
   'worlds.active':'Deine Worlds-Anmeldung ist in Music-Worlds aktiv.',
   'worlds.reviewGuest':'Vorhandenes Gastprofil prüfen',
   'worlds.confirmGuest':'Dieses Gastprofil verknüpfen',

@@ -179,8 +179,9 @@ async function api(req:Request,env:Env){
     const linked=central?await db`SELECT 1 FROM worlds_identity_links WHERE issuer=${central.issuer} AND subject=${central.sub}`:[];
     const guest=central&&!linked.length?await activeGuest(req,db,env):null;
     const target=guestLinkTarget(env);
+    const guestMigrationPending=!!target&&central?.sub===target.subject&&!linked.length;
     return json({enabled:hubConfigured(env),authenticated:!!central,linked:linked.length>0,csrf:central?.csrf,
-      existingGuest:!!guest,guestLink:!!target&&central?.sub===target.subject&&guest?.id===target.profileId});
+      existingGuest:!!guest,guestMigrationPending,guestLink:guestMigrationPending&&guest?.id===target.profileId});
   }
   if(path==='/api/worlds/link/prepare'||path==='/api/worlds/link/confirm'){
     const target=guestLinkTarget(env);
@@ -240,7 +241,8 @@ async function api(req:Request,env:Env){
     if(!central||!raw)throw new AppError(401,'error.sessionExpired');
     const {csrf,...fields}=profileSchema.extend({csrf:z.string().max(128)}).parse(await body(req));
     must(csrf===central.csrf,'error.foreignSite',403);
-    must(guestLinkTarget(env)?.subject!==central.sub&&!await activeGuest(req,db,env),'worlds.existingGuestText',409);
+    must(guestLinkTarget(env)?.subject!==central.sub,'worlds.findGuest',409);
+    must(!await activeGuest(req,db,env),'worlds.existingGuestText',409);
     const id=crypto.randomUUID(),sessionKey=await authHash(raw);
     const rows=await db`WITH created AS (
       INSERT INTO profiles(id,name,theme,language)
