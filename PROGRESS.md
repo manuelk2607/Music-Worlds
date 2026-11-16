@@ -12,9 +12,13 @@ Compute, mit LSN `0/1FEFC68` direkt von Main.
 [GitHub CI](https://github.com/manuelk2607/Music-Worlds/actions/runs/43768076585)
 bestand für den veröffentlichten Commit. Live-Smoke bestätigte öffentliche
 Seiten, PKCE, SEO, Datenschutz und die Ablehnung anonymer Übernahme.
-Vor der persönlichen Bestätigung stimmen alle Prüfsummen für zwei
-Musikprofile, 16 Beiträge, null Ergebnisse und null Zuordnungen mit dem
-Stand vor dem Upload überein. Die Browser-Bestätigung steht noch aus.
+Nach der persönlichen Bestätigung meldete die Seite eine aktive
+Worlds-Anmeldung. Die Produktionsdatenbank bestätigt genau eine Zuordnung
+zur ursprünglichen Gastprofil-UUID, eine aktive Worlds-Sitzung mit
+verifiziertem Anmeldezeitpunkt und dieselbe zentrale Identität wie in
+Slop Urself. Beide Musikprofile, alle 16 Beiträge und die leere
+Ergebnistabelle behalten ihre Prüfsummen. Der Einmalnachweis wurde verbraucht.
+Das zweite Musikprofil ist weiterhin nicht verknüpft.
 
 Der geprüfte Übergang ist auf genau eine zentrale Identität und genau
 eine vorhandene Musikprofil-UUID begrenzbar. Beide Sitzungen sind für
