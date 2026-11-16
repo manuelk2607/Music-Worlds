@@ -1,6 +1,20 @@
 # Music-Worlds — Fortschritt
 
-## Übernahme eines bestehenden Gastprofils vorbereitet
+## Übernahme eines bestehenden Gastprofils – 16.11.2026
+
+Nur das ausdrücklich ausgewählte Kontopaar ist produktiv freigeschaltet.
+Commit `c7936bb`, Worker `759b3fdd-da23-4369-9667-302ae5bc8bc1`, Deployment
+`f4f07b8e-910a-44c3-9e84-6941513b2883`, 100 % Traffic. Rücknahmeversion
+`637db59b-e68e-4085-971a-c1f9dc951068`.
+Der Neon-Sicherungszweig `br-frosty-bar-b90srija` ist bereit, ohne
+Compute, mit LSN `0/1FEFC68` direkt von Main.
+
+[GitHub CI](https://github.com/manuelk2607/Music-Worlds/actions/runs/43768076585)
+bestand für den veröffentlichten Commit. Live-Smoke bestätigte öffentliche
+Seiten, PKCE, SEO, Datenschutz und die Ablehnung anonymer Übernahme.
+Vor der persönlichen Bestätigung stimmen alle Prüfsummen für zwei
+Musikprofile, 16 Beiträge, null Ergebnisse und null Zuordnungen mit dem
+Stand vor dem Upload überein. Die Browser-Bestätigung steht noch aus.
 
 Der geprüfte Übergang ist auf genau eine zentrale Identität und genau
 eine vorhandene Musikprofil-UUID begrenzbar. Beide Sitzungen sind für
@@ -14,8 +28,7 @@ beide Ansichten geprüft.
 23 Unit-Tests, Typprüfung, Lint und Worker-Trockenlauf bestanden.
 Der isolierte PostgreSQL-Test bestätigte den Erhalt von Profil-UUID,
 Punkten und Sprache sowie die Ablehnung anderer Kontopaare, abgelaufener
-Nachweise und doppelter Bestätigung. Produktionsfreigabe für das einzelne
-Profil und Browser-Abnahme stehen aus. Die bestehende Migration 006 genügt.
+Nachweise und doppelter Bestätigung. Die bestehende Migration 006 genügt.
 
 ## Produktive Worlds-Anmeldung – 12.11.2026
 
