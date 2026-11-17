@@ -18,6 +18,7 @@ export const en:Record<MessageKey,string>={
   'error.worldsLinkRefused':'The link has expired or is already assigned. Review the guest profile again.',
   'worlds.signOut':'Sign out of Music-Worlds','worlds.signOutText':'Your Music-Worlds session will end. Your music profile will stay saved.',
   'error.worldsProfileRequired':'Create a music profile for your Worlds account first.',
+  'error.worldsSignInRequired':'Sign in to Worlds to create a new music profile.',
   'error.worldsUnavailable':'Worlds sign-in is temporarily unavailable.',
   'error.worldsLogout':'End this Worlds session from the profile page.',
   'language.name':'English','language.switch':'Language','language.de':'DE','language.en':'EN',

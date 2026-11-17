@@ -62,11 +62,22 @@ const cookie=(response:Response,name:string)=>{
  return line.split(';')[0];
 };
 try{
- assert.equal((await call('/auth/login',{method:'POST'},{...env,HUB_AUTH_ENABLED:'false'})).status,404);
- const guest=await call('/api/session',{method:'POST',json:{name:guestName,theme:'dark',language:'de'}});
+ const legacyEnv={...env,HUB_AUTH_ENABLED:'false'};
+ const guestInput={name:guestName,theme:'dark',language:'de'};
+ assert.equal((await call('/auth/login',{method:'POST'},legacyEnv)).status,404);
+ for(const credentials of [undefined,'__Host-mw='+'0'.repeat(64)]){
+  const blocked=await call('/api/session',{method:'POST',cookie:credentials,json:guestInput});
+  assert.equal(blocked.status,403);
+  assert.equal(blocked.headers.get('set-cookie'),null);
+ }
+ assert.equal((await db`SELECT count(*)::int AS n FROM profiles WHERE name=${guestName}`)[0]?.n,0);
+ const guest=await call('/api/session',{method:'POST',json:guestInput},legacyEnv);
  assert.equal(guest.status,201);
  const guestCookie=cookie(guest,'__Host-mw');
  const guestId=(await guest.json() as {id:string}).id;
+ const reused=await call('/api/session',{method:'POST',cookie:guestCookie,json:guestInput});
+ assert.equal(reused.status,200);
+ assert.equal((await reused.json() as {id:string}).id,guestId);
  const linkEnv={...env,HUB_GUEST_LINK_ENABLED:'true',HUB_REAUTH_VERIFIED:'true',
   HUB_GUEST_LINK_TARGET:JSON.stringify({subject:linkSubject,profileId:guestId})};
  const begin=await call('/auth/login?next=%2Fen%23profil&ui_locales=en',{method:'POST',cookie:guestCookie});
@@ -98,7 +109,7 @@ try{
  assert.equal(logout.status,303);
  assert.equal((await call('/api/me',{cookie:both})).status,401);
  assert.equal((await (await call('/api/me',{cookie:guestCookie})).json() as {id:string}).id,guestId);
- const otherGuest=await call('/api/session',{method:'POST',json:{name:otherGuestName,theme:'dark',language:'de'}});
+ const otherGuest=await call('/api/session',{method:'POST',json:{name:otherGuestName,theme:'dark',language:'de'}},legacyEnv);
  assert.equal(otherGuest.status,201);
  const otherGuestCookie=cookie(otherGuest,'__Host-mw');
  const otherGuestId=(await otherGuest.json() as {id:string}).id;

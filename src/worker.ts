@@ -168,6 +168,7 @@ async function api(req:Request,env:Env){
     if(req.headers.get('Cookie')?.includes('__Host-mw=')){
       try{return json(await identity(req,db,env));}catch(e){if(!(e instanceof AppError)||e.status!==401)throw e;}
     }
+    must(env.HUB_AUTH_ENABLED!=='true','error.worldsSignInRequired',403);
     await limit(db,`session:${ip}`,10,3600);
     const input=profileSchema.parse(await body(req));const id=crypto.randomUUID(),secret=token();
     await db.transaction([db`INSERT INTO profiles(id,name,theme,language) VALUES (${id},${input.name},${input.theme},${input.language})`,

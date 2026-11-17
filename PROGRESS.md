@@ -1,5 +1,17 @@
 # Music-Worlds — Fortschritt
 
+## Neuanlage über Worlds vorbereitet – 17.11.2026
+
+Im Worlds-Modus konnte ein direkter Aufruf der alten Gast-API weiterhin
+ein zweites Profil anlegen. Die API verlangt bei einer Neuanlage jetzt
+die Worlds-Anmeldung. Eine bereits gültige Gastsitzung gibt weiterhin
+ihre bestehende Profil-ID zurück. Der Rückfallmodus kann wie bisher
+Gastprofile anlegen. Es ist keine Datenbankmigration nötig.
+23 Tests, Typprüfung, Lint und Worker-Build bestanden. Die zusätzliche
+Integration prüft die Ablehnung ohne Cookie und mit ungültigem Cookie,
+die Wiederverwendung eines vorhandenen Profils und die bestätigte
+Übernahme. Veröffentlichung und Live-Prüfung stehen aus.
+
 ## Übernahme eines bestehenden Gastprofils – 16.11.2026
 
 Nur das ausdrücklich ausgewählte Kontopaar ist produktiv freigeschaltet.

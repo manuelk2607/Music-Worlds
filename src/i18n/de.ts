@@ -17,6 +17,7 @@ export const de={
   'error.worldsLinkRefused':'Die Verknüpfung ist abgelaufen oder bereits vergeben. Prüfe das Gastprofil erneut.',
   'worlds.signOut':'Von Music-Worlds abmelden','worlds.signOutText':'Deine Sitzung in Music-Worlds wird beendet. Dein Musikprofil bleibt gespeichert.',
   'error.worldsProfileRequired':'Lege zuerst ein Musikprofil für dein Worlds-Konto an.',
+  'error.worldsSignInRequired':'Melde dich bei Worlds an, um ein neues Musikprofil anzulegen.',
   'error.worldsUnavailable':'Die Worlds-Anmeldung ist gerade nicht erreichbar.',
   'error.worldsLogout':'Beende diese Worlds-Sitzung über die Profilseite.',
   'language.name':'Deutsch','language.switch':'Sprache','language.de':'DE','language.en':'EN',
