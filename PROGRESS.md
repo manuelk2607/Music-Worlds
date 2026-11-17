@@ -1,6 +1,6 @@
 # Music-Worlds — Fortschritt
 
-## Neuanlage über Worlds vorbereitet – 17.11.2026
+## Neuanlage nur über Worlds produktiv – 17.11.2026
 
 Im Worlds-Modus konnte ein direkter Aufruf der alten Gast-API weiterhin
 ein zweites Profil anlegen. Die API verlangt bei einer Neuanlage jetzt
@@ -10,7 +10,7 @@ Gastprofile anlegen. Es ist keine Datenbankmigration nötig.
 23 Tests, Typprüfung, Lint und Worker-Build bestanden. Die zusätzliche
 Integration prüft die Ablehnung ohne Cookie und mit ungültigem Cookie,
 die Wiederverwendung eines vorhandenen Profils und die bestätigte
-Übernahme. Veröffentlichung und Live-Prüfung stehen aus.
+Übernahme.
 
 Der neue Auditbefund für `picomatch` kam aus der TypeScript-Lint-Kette.
 ESLint nutzt jetzt Babel ausschließlich zum Parsen von TypeScript. Dieselben
@@ -24,6 +24,16 @@ Der Release erhält die bestehenden Worker-Einstellungen. Der Live-Test
 prüft auch die Sperre für neue Gastprofile und den Empfänger für globale
 Abmeldung. Bei einem fehlgeschlagenen Live-Test stellt der Workflow nur
 dann den vorherigen Worker wieder her, wenn sein Upload weiterhin aktiv ist.
+
+`76eb5da` läuft als Worker-Version `5af39fb2-c8fb-4465-b22e-ea98a7520892`.
+Rücknahmeversion: `33431568-a564-4cb5-8dce-5329bc30693c`.
+Der [Produktionslauf](https://github.com/manuelk2607/Music-Worlds/actions/runs/44170781249)
+bestand 23 Tests, 87 Datenbankprüfungen, den separaten Worlds-Test und den
+Live-Smoke. Ohne Anmeldung legt die alte API kein Profil und kein Cookie
+an; PKCE-Anmeldung und Abmelde-Empfänger bleiben erreichbar. Der Vergleich
+vor und nach dem Release bestätigt unveränderte Prüfsummen für zwei
+Profile, 16 Beiträge, null Ergebnisse und eine bestehende Zuordnung.
+Ein zweites Altprofil bleibt für einen nachgewiesenen Eigentümer offen.
 
 ## Übernahme eines bestehenden Gastprofils – 16.11.2026
 
