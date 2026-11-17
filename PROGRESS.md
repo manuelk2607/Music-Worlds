@@ -12,6 +12,13 @@ Integration prüft die Ablehnung ohne Cookie und mit ungültigem Cookie,
 die Wiederverwendung eines vorhandenen Profils und die bestätigte
 Übernahme. Veröffentlichung und Live-Prüfung stehen aus.
 
+Der neue Auditbefund für `picomatch` kam aus der TypeScript-Lint-Kette.
+ESLint nutzt jetzt Babel ausschließlich zum Parsen von TypeScript. Dieselben
+Regeln und Dateien bleiben aktiv; der Worker hat keine neue Abhängigkeit.
+23 Tests, Typprüfung, Lint, sechs gezielte Syntax-/Regelproben, Audit
+(0 Befunde) und Worker-Trockenlauf bestanden. Die Freigabeprüfung läuft
+erneut gegen dieselbe vorhandene Testdatenbank.
+
 ## Übernahme eines bestehenden Gastprofils – 16.11.2026
 
 Nur das ausdrücklich ausgewählte Kontopaar ist produktiv freigeschaltet.
