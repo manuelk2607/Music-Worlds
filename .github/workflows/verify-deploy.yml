@@ -44,13 +44,17 @@ jobs:
           DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
         run: npm run db:migrate
       - name: Deploy existing Worker
+        id: release
         if: inputs.deploy
+        shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: 'false'
           WORLDS_AUTH: ${{ inputs.worlds_auth }}
         run: |
+          previous=$(npx wrangler deployments list --name music-worlds --json | jq -er 'last | .versions | select(length == 1 and .[0].percentage == 100) | .[0].version_id')
+          printf 'previous=%s\n' "$previous" >> "$GITHUB_OUTPUT"
           args=(--var "APP_COMMIT:${GITHUB_SHA}")
           if [ "$WORLDS_AUTH" = true ]; then
             args+=(
@@ -60,9 +64,28 @@ jobs:
               --var HUB_OIDC_RESOURCE:https://music-worlds.maki26.workers.dev/api
             )
           fi
-          npx wrangler deploy --env='' "${args[@]}"
+          npx wrangler deploy --env='' --keep-vars "${args[@]}" | tee "$RUNNER_TEMP/music-worlds-release.log"
+          published=$(sed -nE 's/^Current Version ID: ([a-f0-9-]{36})$/\1/p' "$RUNNER_TEMP/music-worlds-release.log")
+          test -n "$published"
+          printf 'published=%s\n' "$published" >> "$GITHUB_OUTPUT"
       - name: Production smoke
+        id: smoke
         if: inputs.deploy
         env:
           EXPECT_WORLDS_AUTH: ${{ inputs.worlds_auth }}
         run: npm run smoke
+      - name: Restore Music-Worlds if production smoke fails
+        if: failure() && steps.release.outcome == 'success' && steps.smoke.outcome == 'failure'
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+          PREVIOUS: ${{ steps.release.outputs.previous }}
+          PUBLISHED: ${{ steps.release.outputs.published }}
+        run: |
+          active=$(npx wrangler deployments list --name music-worlds --json | jq -er 'last | .versions | select(length == 1 and .[0].percentage == 100) | .[0].version_id')
+          test "$active" = "$PUBLISHED"
+          npx wrangler rollback "$PREVIOUS" --name music-worlds --yes --message 'Restore Music-Worlds after failed smoke check'
+          restored=$(npx wrangler deployments list --name music-worlds --json | jq -er 'last | .versions | select(length == 1 and .[0].percentage == 100) | .[0].version_id')
+          test "$restored" = "$PREVIOUS"

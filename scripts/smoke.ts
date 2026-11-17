@@ -33,4 +33,14 @@ if(process.env.EXPECTED_COMMIT||process.env.GITHUB_SHA)assert.equal(health.commi
 const catalog=await (await fetch(origin+'/api/catalog')).json() as any;assert.ok(catalog.available>=8);assert.ok(catalog.songs.length>=8);
 const privateRoute=await fetch(origin+'/api/me');assert.equal(privateRoute.status,401);assert.match(privateRoute.headers.get('cache-control')||'',/no-store/);
 const csrf=await fetch(origin+'/api/session',{method:'POST',headers:{Origin:'https://attacker.test','Content-Type':'application/json'},body:JSON.stringify({name:'Must not exist'})});assert.equal(csrf.status,403);
+if(process.env.EXPECT_WORLDS_AUTH==='true'){
+  const anonymous=await fetch(origin+'/api/session',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:'{}'});
+  assert.equal(anonymous.status,403,'Worlds must be required for new profiles');
+  assert.equal(anonymous.headers.get('set-cookie'),null);
+  const unsigned=await fetch(origin+'/auth/events/session-revoked',{
+    method:'POST',redirect:'manual',headers:{'Content-Type':'application/secevent+jwt'},body:'unsigned-release-readiness-check',
+  });
+  assert.equal(unsigned.status,400,'Worlds sign-out receiver must remain active');
+  assert.deepEqual(await unsigned.json(),{err:'invalid_request'});
+}
 console.log('Production health, catalogue, privacy and CSRF checks passed.');

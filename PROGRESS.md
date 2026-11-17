@@ -17,7 +17,13 @@ ESLint nutzt jetzt Babel ausschließlich zum Parsen von TypeScript. Dieselben
 Regeln und Dateien bleiben aktiv; der Worker hat keine neue Abhängigkeit.
 23 Tests, Typprüfung, Lint, sechs gezielte Syntax-/Regelproben, Audit
 (0 Befunde) und Worker-Trockenlauf bestanden. Die Freigabeprüfung läuft
-erneut gegen dieselbe vorhandene Testdatenbank.
+erfolgreich gegen dieselbe vorhandene Testdatenbank: 87 Integrationsprüfungen
+und der separate Test für Worlds-Anmeldung und Profilübernahme.
+[GitHub-Prüfung](https://github.com/manuelk2607/Music-Worlds/actions/runs/44170143756)
+Der Release erhält die bestehenden Worker-Einstellungen. Der Live-Test
+prüft auch die Sperre für neue Gastprofile und den Empfänger für globale
+Abmeldung. Bei einem fehlgeschlagenen Live-Test stellt der Workflow nur
+dann den vorherigen Worker wieder her, wenn sein Upload weiterhin aktiv ist.
 
 ## Übernahme eines bestehenden Gastprofils – 16.11.2026
 
