@@ -1,5 +1,28 @@
 # Music-Worlds — Fortschritt
 
+## Zentraler Migrationsnachweis vorbereitet – 23.11.2026
+
+Der produktive Nur-Lese-Abgleich bestätigt genau eine bestehende
+Zuordnung. Migration 008 kennzeichnet eine Gastprofilübernahme direkt
+bei der bestätigten Zuordnung und erfasst ihren Widerruf. Für die
+bereits bestätigte Übernahme kann nur das exakt freigegebene Paar aus
+dem bestehenden Worker-Secret nachgetragen werden. Ein im selben
+Schritt neu angelegtes Worlds-Profil fällt auch dann aus dem Nachtrag,
+wenn es als Ziel angegeben wird. Ein wiederholter Nachtrag erzeugt
+keinen weiteren Nachweis.
+
+Der signierte Sender greift über die eingeschränkte Music-Worlds-Rolle
+und eng begrenzte Datenbankfunktionen auf offene Nachweise zu. Nur der
+exakte Produktions-Worker mit eigener Signatur darf zum fest
+konfigurierten Hub-Endpunkt senden. Der Versand nutzt den bisherigen
+täglichen Cron. Das neue Worker-Secret aktiviert ihn. Die Hub-Datenbank
+benötigt keine weitere Migration.
+
+24 Unit-Tests, Typprüfung, Lint, Sicherheitscheck und Worker-Build
+bestanden. Lokale PostgreSQL-Prüfung mit der eingeschränkten Rolle:
+eindeutiger Nachtrag, Ausschluss von Neuprofilen, Quittierung und
+Widerruf nach Löschung. Die produktive Zustellung steht aus.
+
 ## Neuanlage nur über Worlds produktiv – 17.11.2026
 
 Im Worlds-Modus konnte ein direkter Aufruf der alten Gast-API weiterhin

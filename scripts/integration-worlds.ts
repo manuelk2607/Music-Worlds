@@ -3,6 +3,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {neon} from '@neondatabase/serverless';
 import {exportJWK,generateKeyPair,SignJWT} from 'jose';
 import worker,{type Env} from '../src/worker';
+import {stageReviewedGuestReceipt} from '../src/worlds-receipts';
 import {migrate} from './migrate';
 
 const connection=new URL(process.env.TEST_DATABASE_URL!);
@@ -105,6 +106,9 @@ try{
  assert.equal((await db`SELECT count(*)::int AS n FROM profiles WHERE name=${profileName}`)[0]?.n,1);
  const me=await (await call('/api/me',{cookie:both})).json() as {id:string;language:string;source:string};
  assert.notEqual(me.id,guestId);assert.equal(me.language,'en');assert.equal(me.source,'worlds');
+ const receiptQuery=(text:string,params:unknown[])=>db.query(text,params);
+ assert.equal(await stageReviewedGuestReceipt(receiptQuery,issuer,{subject,profileId:me.id}),false);
+ assert.equal((await db`SELECT count(*)::int AS n FROM worlds_migration_audit WHERE issuer=${issuer} AND subject=${subject}`)[0]?.n,0);
  const logout=await call('/auth/logout?locale=en',{method:'POST',cookie:both,body:new URLSearchParams({csrf:status.csrf})});
  assert.equal(logout.status,303);
  assert.equal((await call('/api/me',{cookie:both})).status,401);
@@ -164,19 +168,35 @@ try{
  assert.deepEqual((await Promise.all([confirm(staged.proof),confirm(staged.proof)])).map(r=>r.status).sort(),[200,409]);
  const linked=await (await call('/api/me',{cookie:linkCookie},linkEnv)).json() as {id:string;language:string;stats:{points:number}};
  assert.equal(linked.id,guestId);assert.equal(linked.language,'de');assert.equal(linked.stats.points,7);
+ assert.equal(await stageReviewedGuestReceipt(receiptQuery,issuer,{subject:linkSubject,profileId:guestId}),false);
+ assert.deepEqual(await db`SELECT local_profile_id,event FROM worlds_migration_audit WHERE issuer=${issuer} AND subject=${linkSubject} ORDER BY id`,
+  [{local_profile_id:guestId,event:'linked'}]);
  assert.equal((await call('/api/me',{cookie:guestCookie},{...linkEnv,HUB_AUTH_ENABLED:'false'})).status,200);
  const ended=await call('/auth/logout',{method:'POST',cookie:credentials,body:new URLSearchParams({csrf:linkStatus.csrf})},linkEnv);
  assert.equal(ended.status,303);
  assert.ok(ended.headers.getSetCookie().some(value=>value.startsWith('__Host-mw=;')));
  assert.equal((await call('/api/me',{cookie:guestCookie},linkEnv)).status,401);
  assert.equal((await call('/api/me',{cookie:otherGuestCookie},linkEnv)).status,200);
+ await db`DELETE FROM worlds_identity_links WHERE issuer=${issuer} AND subject=${linkSubject} AND local_profile_id=${guestId}`;
+ assert.deepEqual(await db`SELECT event FROM worlds_migration_audit WHERE issuer=${issuer} AND subject=${linkSubject} ORDER BY id`,
+  [{event:'linked'},{event:'unlinked'}]);
+ assert.equal((await db`SELECT score FROM results WHERE profile_id=${guestId}`)[0]?.score,7);
+ // Simulate a pre-008 link for the explicitly approved pair.
+ await db`INSERT INTO worlds_identity_links(issuer,subject,local_profile_id) VALUES (${issuer},${linkSubject},${guestId})`;
+ assert.equal(await stageReviewedGuestReceipt(receiptQuery,issuer,{subject:linkSubject,profileId:otherGuestId}),false);
+ assert.equal(await stageReviewedGuestReceipt(receiptQuery,issuer,{subject:linkSubject,profileId:guestId}),true);
+ assert.equal(await stageReviewedGuestReceipt(receiptQuery,issuer,{subject:linkSubject,profileId:guestId}),false);
+ assert.deepEqual(await db`SELECT event FROM worlds_migration_audit WHERE issuer=${issuer} AND subject=${linkSubject} ORDER BY id`,
+  [{event:'linked'},{event:'unlinked'},{event:'linked'}]);
  console.log('PASS: scoped Music guest linking preserves UUID, results and language. Unapproved account pairs, stale proofs and duplicate confirmations are rejected.');
+ console.log('PASS: only confirmed guest links produce receipts, history backfills once and unlink preserves underlying results.');
 }finally{
  globalThis.fetch=originalFetch;
  await db.transaction([
   db`DELETE FROM worlds_auth_transactions WHERE id=ANY(${transactions}::text[])`,
   db`DELETE FROM worlds_auth_sessions WHERE issuer=${issuer} AND subject IN (${subject},${linkSubject})`,
   db`DELETE FROM profiles WHERE name IN (${profileName},${guestName},${otherGuestName})`,
+  db`DELETE FROM worlds_migration_audit WHERE issuer=${issuer} AND subject IN (${subject},${linkSubject})`,
   db`DELETE FROM rate_limits WHERE key=ANY(${[...rateKeys,'worlds:link:'+linkSessionKey]}::text[])`,
  ]);
 }

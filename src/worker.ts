@@ -10,8 +10,9 @@ import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_C
 import {hash as authHash} from '@worlds-hub/auth/store';
 import {guestLinkTarget,hasHubSession,hubConfig,hubConfigured,hubSession,hubSessionEvent,hubSessionEventKey} from './worlds-auth';
 import {sessionRevocationPath} from '@worlds-hub/auth/session-revocation';
+import {reportMusicWorldsMigrationReceipts} from './worlds-receipts';
 
-export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_GUEST_LINK_ENABLED?:string;HUB_REAUTH_VERIFIED?:string;HUB_GUEST_LINK_TARGET?:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;WORLDS_HUB_SESSION_EVENT_JWK?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
+export interface Env {DATABASE_URL:string;SESSION_PEPPER:string;ADMIN_TOKEN:string;SITE_ORIGIN:string;HUB_ORIGIN:string;HUB_AUTH_ENABLED:string;HUB_GUEST_LINK_ENABLED?:string;HUB_REAUTH_VERIFIED?:string;HUB_GUEST_LINK_TARGET?:string;HUB_OIDC_ISSUER?:string;HUB_OIDC_CLIENT_ID?:string;HUB_OIDC_RESOURCE?:string;WORLDS_HUB_SESSION_EVENT_JWK?:string;WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK?:string;PUBLIC_INDEXING?:string;APP_COMMIT?:string;ASSETS:{fetch(req:Request):Promise<Response>};READ_LIMIT?:{limit(input:{key:string}):Promise<{success:boolean}>};MEDIA?:PrivateStorage}
 type DB=NeonQueryFunction<false,false>;
 type Identity={id:string;name:string;theme:string;language:Locale;source?:'worlds'};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
@@ -230,8 +231,8 @@ async function api(req:Request,env:Env){
         AND g.token_hash=${guestKey} AND g.profile_id=p.local_profile_id AND g.profile_id=${target.profileId}::uuid
         AND p.expires_at>now() AND g.expires_at>now() AND c.expires>extract(epoch FROM now())*1000
       RETURNING p.local_profile_id
-    ) INSERT INTO worlds_identity_links(issuer,subject,local_profile_id)
-      SELECT ${central.issuer},${central.sub},local_profile_id FROM consumed RETURNING local_profile_id`;
+    ) INSERT INTO worlds_identity_links(issuer,subject,local_profile_id,legacy_migration)
+      SELECT ${central.issuer},${central.sub},local_profile_id,true FROM consumed RETURNING local_profile_id`;
     if(!linked.length)throw new AppError(409,'error.worldsLinkRefused');
     return json({linked:true});
   }
@@ -436,5 +437,11 @@ export default {
        db.query(`DELETE FROM ${table} WHERE id IN (SELECT id FROM ${table} WHERE expires<extract(epoch FROM now())*1000 LIMIT 1000)`)):[]),
       ...(env.HUB_GUEST_LINK_ENABLED==='true'?[db`DELETE FROM worlds_guest_link_proofs
        WHERE proof_hash IN(SELECT proof_hash FROM worlds_guest_link_proofs WHERE expires_at<=now() LIMIT 500)`]:[])]);
+    try{
+      const result=await reportMusicWorldsMigrationReceipts(env);
+      if(result&&(result.acknowledged||result.conflict))console.info('Worlds migration receipts',result);
+    }catch{
+      throw new Error('Worlds migration receipt delivery needs a retry');
+    }
   }
 };

@@ -23,6 +23,16 @@ Der Actions-Workflow ist zunächst manuell (`workflow_dispatch`, optional `deplo
 
 GitHub-Secrets für CI: TEST_DATABASE_URL (nur QA), DATABASE_URL_UNPOOLED (nur Music-Worlds), CLOUDFLARE_ACCOUNT_ID und ein zweckgebundener CLOUDFLARE_API_TOKEN mit Worker-Edit im vorhandenen Konto. Der kurzlebige lokale OAuth-Token wird nicht in GitHub hinterlegt. Alle vier Repository-Secrets sind eingerichtet und durch den erfolgreichen Workflow praktisch geprüft. Lokale Bereitstellung bleibt zusätzlich über die bestätigte Wrangler-Anmeldung möglich.
 
+Für die signierten Migrationsnachweise zuerst einen Wiederherstellungspunkt
+und die bisherige Worker-Version festhalten. Der vorhandene Workflow wendet
+Migration 008 an. Die geschützte Übernahme schreibt ihren Nachweis in
+derselben Transaktion. Das geprüfte historische Paar aus dem bestehenden
+Gastprofil-Secret wird höchstens einmal nachgetragen. Der tägliche Versand
+beginnt nach Einrichtung eines eigenen `WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK`
+im Music-Worlds-Worker und des öffentlichen Prüfschlüssels im Hub.
+Die Quellenprofile behalten ihre IDs. Rollback über die vorherige
+Worker-Version, ohne produktive Audit-Einträge oder Zuordnungen zu entfernen.
+
 ## Datenschutz, SEO und Administration
 
 Gastsitzungen verfallen nach 30 Tagen, Räume nach 24 Stunden; täglicher Cron entfernt abgelaufene Räume, Sessions und Missbrauchszähler in begrenzten Batches. Spielername/Statistiken sind innerhalb der Plattform sichtbar. Eigene Daten lassen sich in Profil endgültig löschen; betroffene Räume schließen, eigene Texte/Belege/Audittexte werden entfernt und Sitzungen widerrufen. Verantwortlichen-/Kontaktangaben und verbindliche langfristige Aufbewahrungsregel für verwaiste Gastdaten vor einer breiteren Freigabe ergänzen. Produktivlogs enthalten keine Anfragekörper oder Secrets.
