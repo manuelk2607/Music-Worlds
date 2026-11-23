@@ -1,6 +1,6 @@
 # Music-Worlds — Fortschritt
 
-## Zentraler Migrationsnachweis vorbereitet – 23.11.2026
+## Zentraler Migrationsnachweis produktiv – 23.11.2026
 
 Der produktive Nur-Lese-Abgleich bestätigt genau eine bestehende
 Zuordnung. Migration 008 kennzeichnet eine Gastprofilübernahme direkt
@@ -25,7 +25,19 @@ Widerruf nach Löschung. [GitHub QA](https://github.com/manuelk2607/Music-Worlds
 bestand einschließlich des bestätigten Gastprofil-Ablaufs.
 Produktives Paar stimmt mit der bereits bestätigten Slop-Identität überein.
 Neon-Sicherung `br-mute-dust-b9q9wt0a`, LSN `0/212BF68`, ohne Compute
-und bereit. Release und Zustellung folgen über bestehende Zugänge.
+und bereit. Migration 008 ist produktiv. Prüfsumme und eingeschränkte
+Funktionen bestätigt. Der direkte Lesezugriff auf das Audit und das
+Ändern von Zuordnungen bleiben für die Laufzeitrolle gesperrt.
+
+`8069540` ist als Worker `8e97e0e5-e8ec-413a-b28f-9df8e8852bc4` live.
+[GitHub-Release](https://github.com/manuelk2607/Music-Worlds/actions/runs/45268081000)
+bestand mit QA und produktivem Smoke-Test für Anmeldung, Abmeldung und
+Zugriffsschutz. Vorherige Worker-Version `5af39fb2`. Der signierte
+Einzellauf bestätigte Revision 1 ohne Konflikt. Die Prüfsummen von zwei
+Profilen, 16 Beiträgen, null Spielresultaten und der einen Zuordnung
+stimmen überein. Der automatische Versand ist eingerichtet. Eine
+automatische Zustellung und die persönliche Kontoansicht sind für
+Music-Worlds noch nicht beobachtet.
 
 ## Neuanlage nur über Worlds produktiv – 17.11.2026
 
