@@ -21,7 +21,11 @@ benötigt keine weitere Migration.
 24 Unit-Tests, Typprüfung, Lint, Sicherheitscheck und Worker-Build
 bestanden. Lokale PostgreSQL-Prüfung mit der eingeschränkten Rolle:
 eindeutiger Nachtrag, Ausschluss von Neuprofilen, Quittierung und
-Widerruf nach Löschung. Die produktive Zustellung steht aus.
+Widerruf nach Löschung. [GitHub QA](https://github.com/manuelk2607/Music-Worlds/actions/runs/45267464276)
+bestand einschließlich des bestätigten Gastprofil-Ablaufs.
+Produktives Paar stimmt mit der bereits bestätigten Slop-Identität überein.
+Neon-Sicherung `br-mute-dust-b9q9wt0a`, LSN `0/212BF68`, ohne Compute
+und bereit. Release und Zustellung folgen über bestehende Zugänge.
 
 ## Neuanlage nur über Worlds produktiv – 17.11.2026
 

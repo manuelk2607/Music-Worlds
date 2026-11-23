@@ -11,6 +11,10 @@ on:
         description: Verify Worlds login and enable it on the existing Worker if deploying
         type: boolean
         default: false
+      worlds_receipts:
+        description: Upload the dedicated Music-Worlds receipt key with the checked release
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -28,6 +32,28 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run typecheck && npm run lint && npm test && npm audit --audit-level=moderate && npm run build
+      - name: Verify receipt deployment configuration
+        if: inputs.worlds_receipts
+        env:
+          DEPLOY: ${{ inputs.deploy }}
+          WORLDS_AUTH: ${{ inputs.worlds_auth }}
+          WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK: ${{ secrets.WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK }}
+        run: |
+          test "$DEPLOY" = true && test "$WORLDS_AUTH" = true
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict';
+          import {createPrivateKey,createPublicKey} from 'node:crypto';
+          try {
+            const {kid,kty,crv,x,d}=JSON.parse(process.env.WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK??'');
+            assert.ok(typeof kid==='string'&&/^[A-Za-z0-9_-]{1,64}$/.test(kid)&&kty==='OKP'&&crv==='Ed25519'&&
+              typeof x==='string'&&/^[A-Za-z0-9_-]{43}$/.test(x)&&typeof d==='string'&&/^[A-Za-z0-9_-]{43}$/.test(d));
+            const key=createPrivateKey({key:{kty,crv,x,d},format:'jwk'});
+            assert.equal(createPublicKey(key).export({format:'jwk'}).x,x);
+          } catch {
+            process.exitCode=1;
+            console.error('A dedicated and valid Music-Worlds receipt signing key is required.');
+          }
+          NODE
       - name: Optional isolated database integration tests
         env:
           TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
@@ -42,7 +68,19 @@ jobs:
         if: inputs.deploy
         env:
           DATABASE_URL_UNPOOLED: ${{ secrets.DATABASE_URL_UNPOOLED }}
-        run: npm run db:migrate
+        run: |
+          node --input-type=module - <<'NODE'
+          try {
+            const target=new URL(process.env.DATABASE_URL_UNPOOLED??'');
+            if(!['postgres:','postgresql:'].includes(target.protocol)||
+               target.hostname!=='ep-delicate-recipe-b9d3wj25.c-7.eu-central-1.aws.neon.tech'||
+               target.pathname!=='/neondb'||target.username!=='neondb_owner')throw new Error();
+          } catch {
+            process.exitCode=1;
+            console.error('Music-Worlds migrations require its exact direct production connection.');
+          }
+          NODE
+          npm run db:migrate
       - name: Deploy existing Worker
         id: release
         if: inputs.deploy
@@ -52,6 +90,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: 'false'
           WORLDS_AUTH: ${{ inputs.worlds_auth }}
+          WORLDS_RECEIPTS: ${{ inputs.worlds_receipts }}
+          WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK: ${{ secrets.WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK }}
         run: |
           previous=$(npx wrangler deployments list --name music-worlds --json | jq -er 'last | .versions | select(length == 1 and .[0].percentage == 100) | .[0].version_id')
           printf 'previous=%s\n' "$previous" >> "$GITHUB_OUTPUT"
@@ -63,6 +103,12 @@ jobs:
               --var HUB_OIDC_CLIENT_ID:CxxmMJaWneXdwCQNckMcEOxWGvDnczVp
               --var HUB_OIDC_RESOURCE:https://music-worlds.maki26.workers.dev/api
             )
+          fi
+          if [ "$WORLDS_RECEIPTS" = true ]; then
+            secret_file=$(mktemp "$RUNNER_TEMP/music-worlds-receipts.XXXXXX")
+            trap 'rm -f -- "$secret_file"' EXIT
+            node --input-type=module -e 'import {writeFileSync} from "node:fs"; writeFileSync(process.argv[1],JSON.stringify({WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK:process.env.WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK}),{mode:0o600})' "$secret_file"
+            args+=(--secrets-file "$secret_file")
           fi
           npx wrangler deploy --env='' --keep-vars "${args[@]}" | tee "$RUNNER_TEMP/music-worlds-release.log"
           published=$(sed -nE 's/^Current Version ID: ([a-f0-9-]{36})$/\1/p' "$RUNNER_TEMP/music-worlds-release.log")
