@@ -1,5 +1,16 @@
 # Music-Worlds — Fortschritt
 
+## Verbleibendes Gastprofil geprüft – 24.11.2026
+
+Der Produktionsabgleich zählt zwei Profile. Eines ist über Worlds verknüpft.
+Zum zweiten gehören acht Beiträge und keine Spielergebnisse. Für dieses
+Profil gibt es keine gespeicherte Gastsitzung, keine frühere zentrale
+Zuordnung, keine archivierte Quellautor-Referenz und keinen gültigen
+Übernahmenachweis. Die vorhandene Selbstübernahme wäre selbst bei
+allgemeiner Freischaltung für dieses Profil nicht nutzbar. Profil und
+Beiträge wurden unverändert belassen. Für eine Übernahme ist ein
+unabhängiger, überprüfbarer Eigentumsnachweis erforderlich.
+
 ## Automatischer Migrationsversand korrigiert – 24.11.2026
 
 Das gemeinsame Auth-Paket 0.1.7 verwendet Cloudflares unterstützten
