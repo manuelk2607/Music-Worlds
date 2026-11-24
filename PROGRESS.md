@@ -1,5 +1,13 @@
 # Music-Worlds — Fortschritt
 
+## Automatischer Migrationsversand korrigiert – 24.11.2026
+
+Das gemeinsame Auth-Paket 0.1.7 verwendet Cloudflares unterstützten
+Weiterleitungsmodus und weist 3xx-Antworten ab. Die Warteschlange behält
+ihren Eintrag bei einem Fehler. 24 Tests, Typprüfung, Lint und Worker-Build
+bestanden. Die Veröffentlichung verwendet den vorhandenen Worker-Schlüssel
+und denselben Zeitplan.
+
 ## Zentraler Migrationsnachweis produktiv – 23.11.2026
 
 Der produktive Nur-Lese-Abgleich bestätigt genau eine bestehende

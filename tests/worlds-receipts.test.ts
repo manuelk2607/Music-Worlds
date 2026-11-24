@@ -22,18 +22,18 @@ test('Music-Worlds signs receipts only for its fixed Hub endpoint and retries wi
   ASSETS:{fetch:async()=>new Response(null)},
  };
  const operations:unknown[][]=[];
- let failed=true;
+ let failure=503;
  const states:unknown[]=[];
  const refs=new Set<unknown>();
  const send=t.mock.method(globalThis,'fetch',async(target:unknown,request:RequestInit)=>{
   assert.equal(target,url);
-  assert.equal(request.redirect,'error');
+  assert.equal(request.redirect,'manual');
   const {payload}=await jwtVerify(String(request.body),publicKey,{issuer:origin,audience:url,typ:'worlds-migration-receipt+jwt'});
   assert.equal(payload.identity_issuer,issuer);
   assert.equal(payload.sub,'reviewed');
   assert.equal(JSON.stringify(payload).includes(profileId),false);
   refs.add(payload.account_ref);
-  if(failed)return Response.json({}, {status:503});
+  if(failure)return Response.json({}, {status:failure,headers:{location:'https://untrusted.example/receipt'}});
   states.push(payload.state);
   return Response.json({result:'duplicate'});
  });
@@ -55,7 +55,10 @@ test('Music-Worlds signs receipts only for its fixed Hub endpoint and retries wi
  assert.equal(send.mock.callCount(),0);
  await assert.rejects(reportMusicWorldsMigrationReceipts(env,query),/refused delivery/);
  assert.deepEqual(operations,[]);
- failed=false;
+ failure=307;
+ await assert.rejects(reportMusicWorldsMigrationReceipts(env,query),/unavailable/);
+ assert.deepEqual(operations,[]);
+ failure=0;
  assert.deepEqual(await reportMusicWorldsMigrationReceipts(env,query),{acknowledged:2,conflict:0});
  assert.deepEqual(states,['confirmed','revoked']);
  assert.equal(refs.size,1);
