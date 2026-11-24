@@ -15,6 +15,12 @@ prüfte die Rückkehr zum Beitragsformular nach einer Profilerstellung. WebKit
 EN bei 320 px prüfte einen privaten Raumeinladungslink mit bestehendem Profil.
 Beide nutzten simulierte Auth-Antworten und prüften die einmalige Rückkehr.
 
+Der erste Upload `4d0cc566` wurde auf `7c0341bc` zurückgenommen. Die
+[Produktionsprüfung](https://github.com/manuelk2607/Music-Worlds/actions/runs/45443607435)
+sah unmittelbar nach dem Upload noch den vorherigen Commit. Die Live-Prüfung
+wartet jetzt begrenzt auf den exakten neuen Commit, bevor sie Katalog,
+Anmeldung, geschützte Endpunkte und Abmeldung prüft.
+
 ## Verbleibendes Gastprofil geprüft – 24.11.2026
 
 Der Produktionsabgleich zählt zwei Profile. Eines ist über Worlds verknüpft.
