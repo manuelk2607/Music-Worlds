@@ -7,6 +7,11 @@ Weiterleitungsmodus und weist 3xx-Antworten ab. Die Warteschlange behält
 ihren Eintrag bei einem Fehler. 24 Tests, Typprüfung, Lint und Worker-Build
 bestanden. Die Veröffentlichung verwendet den vorhandenen Worker-Schlüssel
 und denselben Zeitplan.
+`f798f88` läuft als Worker `7c0341bc-0e38-4570-94ef-73b3cfad5039`.
+[GitHub und Produktionsprüfung](https://github.com/manuelk2607/Music-Worlds/actions/runs/45389185697)
+bestanden mit Worlds-Anmeldung, Logout, Katalog und 03:17-UTC-Zeitplan.
+Die Schema-Prüfung musste keine Migration anwenden. Rücknahmeversion
+`8e97e0e5`. Ein automatischer Lauf mit neuem Nachweis steht aus.
 
 ## Zentraler Migrationsnachweis produktiv – 23.11.2026
 
