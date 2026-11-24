@@ -1,5 +1,20 @@
 # Music-Worlds — Fortschritt
 
+## Worlds-Anmeldung setzt den Einstieg fort – 24.11.2026
+
+Nach bestätigter Worlds-Anmeldung kehrt Music-Worlds in demselben Tab zum
+Spielbereich, zum Beitragsformular, zum eingeladenen Raum oder zur
+Moderationsanmeldung zurück. Falls erst ein Profil erstellt oder übernommen
+werden muss, folgt der Rücksprung danach. Der Tab verwirft das Ziel nach
+einmaliger Nutzung oder nach 15 Minuten. Ein Raumcode bleibt im Tab.
+Der registrierte Rücksprung zum Profil und die Berechtigungsprüfungen für
+Räume, Beiträge und Moderation greifen wie bisher.
+
+26 Tests, Typprüfung, Lint und Worker-Build bestanden. Chromium DE am Desktop
+prüfte die Rückkehr zum Beitragsformular nach einer Profilerstellung. WebKit
+EN bei 320 px prüfte einen privaten Raumeinladungslink mit bestehendem Profil.
+Beide nutzten simulierte Auth-Antworten und prüften die einmalige Rückkehr.
+
 ## Verbleibendes Gastprofil geprüft – 24.11.2026
 
 Der Produktionsabgleich zählt zwei Profile. Eines ist über Worlds verknüpft.

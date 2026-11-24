@@ -1,5 +1,6 @@
 import { normalizeExternalMedia } from './media-providers';
 import {date as formatDate,isMessageKey,localeFrom,localeFromPath,localePath,number as formatNumber,t,type Locale} from './i18n';
+import {rememberWorldsReturn,takeWorldsReturn} from './worlds-return';
 type Data=Record<string,any>;
 const main=document.querySelector<HTMLElement>('main')!,dialog=document.querySelector<HTMLDialogElement>('#dialog')!;
 const landingIndexing=document.querySelector<HTMLMetaElement>('meta[name=mw-index-root]')?.content==='true';
@@ -24,6 +25,15 @@ function pageTitle(kicker:string,title:string,description:string){return `<div c
 function modal(title:string,content:string){dialog.innerHTML=`<button class="close ghost" data-close aria-label="${esc(tr('dialog.close'))}">×</button><h2>${esc(title)}</h2>${content}`;dialog.showModal();$('[data-close]',dialog).onclick=()=>dialog.close();}
 function worldsLoginHref(reauth=false){return '/auth/start?'+new URLSearchParams({next:localePath('/',locale)+'#profil',ui_locales:locale,...(reauth?{reauth:'1'}:{})});}
 async function signInWithWorlds(reauth=false){location.assign(worldsLoginHref(reauth));}
+function resumeWorldsReturn(){
+ if(location.hash!=='#profil'||me?.source!=='worlds')return false;
+ try{
+  const fragment=takeWorldsReturn(sessionStorage);
+  if(!fragment)return false;
+  history.replaceState(null,'',localePath('/',locale)+fragment);
+  return true;
+ }catch{return false;}
+}
 async function reviewGuestProfile(){
  const staged=await api('/worlds/link/prepare','POST',{csrf:worlds.csrf});
  modal(tr('worlds.reviewGuest'),`<p>${tr('worlds.linkText')}</p>
@@ -42,12 +52,16 @@ async function reviewGuestProfile(){
 async function signOutOfWorlds(){
  const response=await fetch('/auth/logout?locale='+locale,{method:'POST',body:new URLSearchParams({csrf:worlds.csrf??''})});
  if(!response.ok)throw new Error(tr('error.worldsUnavailable'));
+ try{takeWorldsReturn(sessionStorage);}catch{/* The tab may block storage. */}
  localStorage.removeItem('mw-room');
  location.assign(localePath('/',locale)+'#profil');
  location.reload();
 }
 async function ensureMe():Promise<boolean>{
   if(me)return true;
+  if(worlds.enabled&&(!worlds.authenticated||worlds.existingGuest||worlds.guestMigrationPending)){
+    try{rememberWorldsReturn(sessionStorage,location.hash||'#spielen');}catch{/* The tab may block storage. */}
+  }
   if(worlds.enabled&&!worlds.authenticated){location.assign(worldsLoginHref());return false;}
   if(worlds.existingGuest||worlds.guestMigrationPending){location.hash='profil';return false;}
   return new Promise(resolve=>{
@@ -132,7 +146,9 @@ async function profile(){
       ${worlds.enabled&&central?`<button class="ghost" id="worlds-action">${tr('worlds.signOut')}</button>`:''}
       ${worlds.guestLink?`<button class="ghost" id="review-guest">${tr('worlds.reviewGuest')}</button>
        <button class="ghost" id="renew-worlds">${tr('worlds.renew')}</button>`:''}`);
-    if(!existing&&(!worlds.enabled||central))$('#begin').onclick=()=>run(async()=>{if(await ensureMe())await profile();});
+    if(!existing&&(!worlds.enabled||central))$('#begin').onclick=()=>run(async()=>{
+      if(await ensureMe()){if(resumeWorldsReturn())await route();else await profile();}
+    });
     if(worlds.enabled&&central)$('#worlds-action').onclick=()=>run(signOutOfWorlds);
     if(worlds.guestLink){
      $('#review-guest').onclick=()=>run(reviewGuestProfile);
@@ -204,7 +220,10 @@ function schedulePoll(){clearTimeout(poll);if(!location.hash.startsWith('#raum/'
   schedulePoll();},document.hidden?15000:Math.min(15000,3000*(pollErrors+1)));}
 async function enterRoom(code:string){
   if(!/^[A-Z2-9]{8}$/.test(code))throw new Error(tr('error.invalidRoom'));
-  if(!await ensureMe()){location.hash='spielen';return;}
+  if(!await ensureMe()){
+    if(location.hash===`#raum/${code}`&&(!worlds.enabled||worlds.authenticated))location.hash='spielen';
+    return;
+  }
   try{room=await api('/rooms/'+code);}catch(e){if((e as any).status===403)room=await api('/rooms/'+code+'/join','POST',{});else throw e;}
   localStorage.setItem('mw-room',code);offset=room!.serverTime-Date.now();renderRoom();schedulePoll();
 }
@@ -247,4 +266,5 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&room)void
 document.querySelectorAll<HTMLButtonElement>('[data-language]').forEach(button=>button.onclick=()=>run(()=>selectLanguage(localeFrom(button.dataset.language))));
 void (async()=>{localStorage.setItem('mw-language',locale);if(location.pathname==='/'&&locale==='en')history.replaceState(null,'','/en'+location.hash);shell();
  try{worlds=await api('/worlds/status');}catch{/* Guest mode remains available when Worlds is disabled. */}
- try{me=await api('/me');document.documentElement.dataset.theme=me!.theme;if(me!.language&&me!.language!==locale){locale=localeFrom(me!.language);localStorage.setItem('mw-language',locale);history.replaceState(null,'',localePath(location.pathname,locale)+location.hash);shell();}}catch{}await route();})();
+ try{me=await api('/me');document.documentElement.dataset.theme=me!.theme;if(me!.language&&me!.language!==locale){locale=localeFrom(me!.language);localStorage.setItem('mw-language',locale);history.replaceState(null,'',localePath(location.pathname,locale)+location.hash);shell();}}catch{}
+ resumeWorldsReturn();await route();})();
