@@ -21,6 +21,13 @@ sah unmittelbar nach dem Upload noch den vorherigen Commit. Die Live-Prüfung
 wartet jetzt begrenzt auf den exakten neuen Commit, bevor sie Katalog,
 Anmeldung, geschützte Endpunkte und Abmeldung prüft.
 
+`ea6461c` ist als Worker `8f0a8b01-e149-4e14-9a9c-502341d0e8a6` live.
+[GitHub](https://github.com/manuelk2607/Music-Worlds/actions/runs/45444361302)
+bestand mit der vorhandenen QA-Datenbank und den Produktionsprüfungen.
+Der direkte Live-Abruf bestätigte den neuen Commit und das Browser-Skript.
+Rücknahmeversion `7c0341bc`. Eine persönliche Produktionsanmeldung für
+diesen Rücksprung wurde nicht ausgeführt.
+
 ## Verbleibendes Gastprofil geprüft – 24.11.2026
 
 Der Produktionsabgleich zählt zwei Profile. Eines ist über Worlds verknüpft.
