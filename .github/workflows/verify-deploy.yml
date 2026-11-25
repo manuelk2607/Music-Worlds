@@ -8,7 +8,7 @@ on:
         type: boolean
         default: false
       worlds_auth:
-        description: Verify Worlds login and enable it on the existing Worker if deploying
+        description: Also verify Worlds login when running checks only. Production releases always verify it.
         type: boolean
         default: false
       worlds_receipts:
@@ -36,10 +36,9 @@ jobs:
         if: inputs.worlds_receipts
         env:
           DEPLOY: ${{ inputs.deploy }}
-          WORLDS_AUTH: ${{ inputs.worlds_auth }}
           WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK: ${{ secrets.WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK }}
         run: |
-          test "$DEPLOY" = true && test "$WORLDS_AUTH" = true
+          test "$DEPLOY" = true
           node --input-type=module - <<'NODE'
           import assert from 'node:assert/strict';
           import {createPrivateKey,createPublicKey} from 'node:crypto';
@@ -60,7 +59,7 @@ jobs:
           CONFIRM_ISOLATED_TEST_DATABASE: '1'
         run: if [ -n "$TEST_DATABASE_URL" ]; then npm run test:integration; fi
       - name: Verify Worlds login and profile continuity on the existing QA database
-        if: inputs.worlds_auth
+        if: inputs.deploy || inputs.worlds_auth
         env:
           TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
         run: npx --no-install tsx scripts/integration-worlds.ts
@@ -89,21 +88,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           WRANGLER_SEND_METRICS: 'false'
-          WORLDS_AUTH: ${{ inputs.worlds_auth }}
           WORLDS_RECEIPTS: ${{ inputs.worlds_receipts }}
           WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK: ${{ secrets.WORLDS_MIGRATION_RECEIPT_PRIVATE_JWK }}
         run: |
           previous=$(npx wrangler deployments list --name music-worlds --json | jq -er 'last | .versions | select(length == 1 and .[0].percentage == 100) | .[0].version_id')
           printf 'previous=%s\n' "$previous" >> "$GITHUB_OUTPUT"
           args=(--var "APP_COMMIT:${GITHUB_SHA}")
-          if [ "$WORLDS_AUTH" = true ]; then
-            args+=(
-              --var HUB_AUTH_ENABLED:true
-              --var HUB_OIDC_ISSUER:https://ep-bold-boat-batl101c.neonauth.c-8.eu-central-1.aws.neon.tech/worlds_identity/auth
-              --var HUB_OIDC_CLIENT_ID:CxxmMJaWneXdwCQNckMcEOxWGvDnczVp
-              --var HUB_OIDC_RESOURCE:https://music-worlds.maki26.workers.dev/api
-            )
-          fi
           if [ "$WORLDS_RECEIPTS" = true ]; then
             secret_file=$(mktemp "$RUNNER_TEMP/music-worlds-receipts.XXXXXX")
             trap 'rm -f -- "$secret_file"' EXIT
@@ -118,7 +108,7 @@ jobs:
         id: smoke
         if: inputs.deploy
         env:
-          EXPECT_WORLDS_AUTH: ${{ inputs.worlds_auth }}
+          EXPECT_WORLDS_AUTH: 'true'
         run: npm run smoke
       - name: Restore Music-Worlds if production smoke fails
         if: failure() && steps.release.outcome == 'success' && steps.smoke.outcome == 'failure'

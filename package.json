@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "wrangler dev --ip 127.0.0.1",
+    "dev": "wrangler dev --env qa --ip 127.0.0.1",
     "build": "esbuild src/client.ts --bundle --minify --format=esm --outfile=public/app.js && wrangler deploy --env='' --dry-run --outdir dist",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",

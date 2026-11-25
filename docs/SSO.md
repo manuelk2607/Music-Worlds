@@ -1,5 +1,9 @@
 # Worlds Hub
 
+Worlds-Login ist in der Wrangler-Produktionskonfiguration aktiv. Der
+GitHub-Workflow prüft ihn bei jeder Veröffentlichung. Die lokale QA-
+Konfiguration enthält weiterhin den Gastmodus für Tests.
+
 ## Bestehendes Gastprofil übernehmen
 
 Der zweistufige Ablauf zeigt das Worlds-Konto und das bisherige Music-Profil vor der ausdrücklichen Bestätigung. Die Vorschau prüft die vorhandene Gastsitzung und den signierten zentralen `auth_time`. Sie speichert einen einmaligen Nachweis mit beiden Session-Hashes. Die Gültigkeit endet spätestens fünf Minuten nach der zentralen Anmeldung und endet früher, wenn eine der Sitzungen vorher abläuft. Die Bestätigung verbraucht den Nachweis und legt die Zuordnung in derselben Datenbankanweisung an. Eine bereits belegte Zuordnung bleibt erhalten. Die bisherige Profil-UUID trägt weiterhin Punkte, Beiträge, Spielstände und die Spracheinstellung.
@@ -32,7 +36,7 @@ Rücksetzen des Workers ändert keine Zuordnungen in PostgreSQL.
 
 ## Anmeldung und neues Musikprofil vom 05.11.2026
 
-Der Branch `feature/worlds-hub-sso` verwendet die gemeinsame OIDC-Implementierung aus Worlds Hub `049279b`. `HUB_AUTH_ENABLED` ist in beiden Worker-Konfigurationen aus. Für die spätere Abnahme gelten der zentrale Neon-Issuer, der registrierte Music-Client, `https://music-worlds.maki26.workers.dev/auth/callback` und die Music-API-Resource. Die öffentliche Hub-URL bleibt der Navigationslink.
+Der erste Integrationsstand verwendete die gemeinsame OIDC-Implementierung aus Worlds Hub `049279b` mit deaktivierter Anmeldung. Die produktive Anmeldung verwendet den zentralen Neon-Issuer, den registrierten Music-Client, `https://music-worlds.maki26.workers.dev/auth/callback` und die Music-API-Resource. Die öffentliche Hub-URL ist der Navigationslink.
 
 Der Callback erzeugt eine Music-eigene Sitzung. Nach ausdrücklicher Profilerstellung wird die geprüfte Kombination aus Issuer und Subject einer lokalen UUID zugeordnet. Ein Gastprofil behält seinen eigenen Cookie und seine UUID. Wenn eine Worlds-Sitzung vorliegt, prüft der Worker diese zuerst. Eine abgelaufene oder unverknüpfte Worlds-Sitzung erhält keinen Zugriff auf ein Gastprofil. Das lokale Logout widerruft die Worlds-Sitzung in Music und kehrt zur Profilansicht zurück.
 

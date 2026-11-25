@@ -1,5 +1,16 @@
 # Music-Worlds — Fortschritt
 
+## Zentrale Anmeldung als Produktionsstandard – 25.11.2026
+
+Die Produktionskonfiguration enthält die bereits verwendeten Worlds-OIDC-
+Angaben. Wrangler behält die vorhandenen, separat verwalteten Einstellungen.
+Jeder GitHub-Produktionslauf prüft die Zuordnung auf der vorhandenen QA-
+Datenbank und anschließend die zentrale Anmeldung und Abmeldung live.
+`npm run dev` verwendet die vorhandene lokale QA-Konfiguration.
+26 Tests, Typprüfung, Lint und Worker-Trockenlauf mit aktivem Worlds-Login
+bestanden. Der produktive Gesundheitscheck bestätigt `ea6461c` mit aktiver
+Worlds-Anmeldung.
+
 ## Worlds-Anmeldung setzt den Einstieg fort – 24.11.2026
 
 Nach bestätigter Worlds-Anmeldung kehrt Music-Worlds in demselben Tab zum
