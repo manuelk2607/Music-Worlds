@@ -4,7 +4,12 @@ Stand 04.11.2026. Verbindlicher Worker `music-worlds`, Origin https://music-worl
 
 ## Kostenrahmen
 
-Neon-Organisationstarif über API als Free bestätigt. [Aktuelle Preisseite](https://neon.com/pricing) nennt 100 CU-Stunden und 1 GB je Free-Projekt. Dieses Projekt ist zusätzlich auf 0,25 CU, 7200 Compute-Sekunden, 512 MiB logische Daten und 1 GiB Transfer begrenzt; die genaue Quotenabrechnung ist im Dashboard zu prüfen. Der kostenlose Standard-Suspendwert wurde beibehalten; ein eigener Suspend-Override wurde vom Free-Konto abgewiesen und nicht erzwungen. QA zum Testen nutzen, nicht dauerhaft pollen lassen.
+Neon meldet den Organisationstarif Free. Am 25.11.2026 bestätigte die API
+den genehmigten Projektdeckel von 100 CU-Stunden, 512 MiB logischer Daten
+und 1 GiB Transfer. In der laufenden November-Periode waren 2,73 CU-Stunden
+und 34,6 MiB Transfer erfasst. Der frühere Deckel von 2 CU-Stunden hatte
+die Datenbank im November angehalten. Für Inaktivität gilt der kostenlose
+Standard-Suspend. [Neon-Preise und Freikontingente](https://neon.com/pricing)
 
 [Cloudflare-Grenzen](https://developers.cloudflare.com/workers/platform/limits/): Free-Worker haben eine tägliche Request-/CPU-Grenze. Der dokumentierte Free-Rahmen umfasst 100.000 Worker-Anfragen/Tag und 10 ms CPU je HTTP-Anfrage; andere Workers teilen Kontogrenzen. Es wurde kein Tarifwechsel vorgenommen. Kein R2, KV, D1, Durable Object, bezahlter Builddienst, KI- oder GPU-Dienst angelegt. Die Anwendung nutzt nur Worker/Assets, eine Rate-Limit-Bindung und Neon. Zielkosten derzeit **0 zusätzlich gebuchte laufende Kosten**; keine Behauptung über eine abschließende Anbieterrechnung.
 
