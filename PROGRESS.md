@@ -10,6 +10,10 @@ Datenbank und anschließend die zentrale Anmeldung und Abmeldung live.
 26 Tests, Typprüfung, Lint und Worker-Trockenlauf mit aktivem Worlds-Login
 bestanden. Der produktive Gesundheitscheck bestätigt `ea6461c` mit aktiver
 Worlds-Anmeldung.
+[GitHub-Prüfung](https://github.com/manuelk2607/Music-Worlds/actions/runs/45525444571)
+bestätigt Anmeldung und Profilzuordnung auf der vorhandenen QA-Datenbank.
+`main` enthält den bereits produktiven Anwendungscode und die geprüfte
+Release-Konfiguration. Der Prüfungslauf hat den Worker nicht neu hochgeladen.
 
 ## Worlds-Anmeldung setzt den Einstieg fort – 24.11.2026
 
