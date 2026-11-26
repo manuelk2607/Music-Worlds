@@ -18,10 +18,23 @@ export async function session(request:Request,config:AuthConfig):Promise<Session
   const result=await config.store.getSession(await hash(value));
   return result&&result.expires>Date.now()&&result.issuer===config.issuer ? result:null;
 }
+export class OidcProviderUnavailable extends Error {}
+const providerTransport={
+  signal:()=>AbortSignal.timeout(8000),
+  async [oauth.customFetch](url:string,options:RequestInit){
+    let response:Response;
+    try{response=await fetch(url,options);}catch{throw new OidcProviderUnavailable();}
+    if(response.status===429||response.status>=500){
+      await response.body?.cancel().catch(()=>{});
+      throw new OidcProviderUnavailable();
+    }
+    return response;
+  },
+};
 async function metadata(config:AuthConfig) {
   const issuer=new URL(config.issuer);
   if (issuer.protocol!=='https:'||issuer.username||issuer.password||issuer.search||issuer.hash) throw new Error('Invalid issuer');
-  const response=await oauth.discoveryRequest(issuer,{algorithm:'oidc'});
+  const response=await oauth.discoveryRequest(issuer,{...providerTransport,algorithm:'oidc'});
   return oauth.processDiscoveryResponse(issuer,response);
 }
 const client = (config:AuthConfig):oauth.Client => ({client_id:config.clientId,id_token_signed_response_alg:config.algorithm});
@@ -67,16 +80,16 @@ export async function callback(request:Request,config:AuthConfig) {
   const as=await metadata(config),cl=client(config);
   const params=oauth.validateAuthResponse(as,cl,new URL(request.url),tx.state);
   const auth=config.clientSecret?(config.tokenAuthMethod==='client_secret_post'?oauth.ClientSecretPost(config.clientSecret):oauth.ClientSecretBasic(config.clientSecret)):oauth.None();
-  const response=await oauth.authorizationCodeGrantRequest(as,cl,auth,params,config.origin+'/auth/callback',tx.verifier,{additionalParameters:config.resource?{resource:config.resource}:undefined});
+  const response=await oauth.authorizationCodeGrantRequest(as,cl,auth,params,config.origin+'/auth/callback',tx.verifier,{...providerTransport,additionalParameters:config.resource?{resource:config.resource}:undefined});
   // process validates issuer, audience, azp, timestamps, nonce and token response structure.
   // Signature validation is explicit; it is NOT implicit in processing a TLS token response.
   const result=await oauth.processAuthorizationCodeResponse(as,cl,response,{expectedNonce:tx.nonce,requireIdToken:true,maxAge:tx.reauth?300:undefined});
-  await oauth.validateApplicationLevelSignature(as,response);
+  await oauth.validateApplicationLevelSignature(as,response,providerTransport);
   const claims=oauth.getValidatedIdTokenClaims(result);
   if(!claims?.sub)throw new Error('Missing subject');
   let user: {email?:unknown;email_verified?:unknown;name?:unknown}={email:claims.email,email_verified:claims.email_verified,name:claims.name};
   if(claims.email_verified===undefined||claims.email===undefined){
-    const info=await oauth.userInfoRequest(as,cl,result.access_token);
+    const info=await oauth.userInfoRequest(as,cl,result.access_token,providerTransport);
     user=await oauth.processUserInfoResponse(as,cl,claims.sub,info);
   }
   if(user.email_verified!==true||typeof user.email!=='string')throw new Error('Verified email required');

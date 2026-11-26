@@ -4,7 +4,7 @@ import { AppError, contributionSchema, profileSchema, canPublish, normalized, ty
 import { act, createRoom, join, tick, view, type Room, type Action } from './core/game';
 import { publicPages,seoHTML,indexablePage } from './seo';
 import { validateUpload,type PrivateStorage,type MediaPurpose } from './media';
-import {isMessageKey,localeFrom,t,type Locale} from './i18n';
+import {isMessageKey,localeFrom,localePath,t,type Locale} from './i18n';
 import type {MessageKey} from './i18n/de';
 import {backchannelLogout,callback,cookie,logout,readCookie,sameOrigin,SESSION_COOKIE,startLogin,startLoginLink} from '@worlds-hub/auth';
 import {hash as authHash} from '@worlds-hub/auth/store';
@@ -406,10 +406,19 @@ const security={
   'Content-Security-Policy':"default-src 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; style-src 'self'; img-src 'self' data:; connect-src 'self' https://www.youtube.com; frame-src https://www.youtube.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   'X-Robots-Tag':'noindex, nofollow'
 };
+function worldsSignInError(locale:Locale,error:AppError){
+ const heading=t(locale,'route.errorTitle'),message=t(locale,error.key,error.values);
+ const profile=localePath('/',locale)+'#profil';
+ return new Response(`<!doctype html><html lang="${locale}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Music-Worlds – ${heading}</title><link rel="stylesheet" href="/style.css"></head><body><main id="main"><section class="page-title"><h1>${heading}</h1><p>${message}</p><a class="button primary" href="${profile}">${t(locale,'nav.profile')}</a></section></main></body></html>`,{
+  status:error.status,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'},
+ });
+}
 export default {
   async fetch(req:Request,env:Env):Promise<Response>{
-    let r:Response;const path=new URL(req.url).pathname,indexing=env.PUBLIC_INDEXING==='true';
-    const requestLocale=localeFrom(req.headers.get('X-MW-Language')||req.headers.get('Accept-Language'));
+    let r:Response;const url=new URL(req.url),path=url.pathname,indexing=env.PUBLIC_INDEXING==='true';
+    const signIn=['/auth/start','/auth/login','/auth/callback'].includes(path);
+    const preferred=localeFrom(req.headers.get('X-MW-Language')||req.headers.get('Accept-Language')?.split(',')[0]);
+    const requestLocale=signIn?localeFrom(url.searchParams.get('ui_locales'),preferred):preferred;
     try{
       if(path.startsWith('/auth/'))r=await worldsAuth(req,env);
       else if(path.startsWith('/api/'))r=await api(req,env);
@@ -420,11 +429,15 @@ export default {
     }
     catch(e){
       if(e instanceof z.ZodError)r=json({error:e.issues.map(i=>isMessageKey(i.message)?t(requestLocale,i.message):t(requestLocale,'error.validation')).join(' ')},400);
+      else if(e instanceof AppError&&signIn&&['error.worldsUnavailable','error.sessionExpired'].includes(e.key)&&req.headers.get('Accept')?.includes('text/html')){
+       r=worldsSignInError(requestLocale,e);
+      }
       else if(e instanceof AppError)r=json({error:t(requestLocale,e.key,e.values)},e.status);
       else if((e as {code?:string})?.code==='23505')r=json({error:t(requestLocale,'error.duplicate')},409);
       else{console.error('Music-Worlds request failed',e instanceof Error?e.name:'unknown');r=json({error:t(requestLocale,'error.request')},500);}
     }
     const headers=new Headers(r.headers);for(const [k,v]of Object.entries(security))headers.set(k,v);
+    if(signIn&&r.status>=400)headers.set('Referrer-Policy','no-referrer');
     if(indexablePage(path,indexing))headers.set('X-Robots-Tag','index, follow');
     return new Response(r.body,{status:r.status,headers});
   },

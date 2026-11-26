@@ -1,5 +1,15 @@
 # Music-Worlds — Fortschritt
 
+## Wiederanlauf nach unterbrochener Worlds-Anmeldung
+
+Anmeldedienst-Anfragen nutzen die geprüfte Zeitbegrenzung des Hub-Clients.
+Bei vorübergehender Nichterreichbarkeit oder fehlender Anmeldetransaktion
+führt der Browserhinweis in DE/EN zum Music-Worlds-Profil. Die Fehlerseite
+ist privat und enthält keine Rücksprungparameter. 27 Tests, Typprüfung,
+Lint und Build bestanden. Chromium bei 1440 px und WebKit bei 320 px
+prüften den simulierten Ausfall, das Layout und den Rückweg per Tastatur.
+Die Veröffentlichung nutzt den bestehenden Music-Worlds-Workflow.
+
 ## Zentrale Anmeldung als Produktionsstandard – 25.11.2026
 
 Die Produktionskonfiguration enthält die bereits verwendeten Worlds-OIDC-
