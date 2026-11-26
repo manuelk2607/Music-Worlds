@@ -8,7 +8,12 @@ führt der Browserhinweis in DE/EN zum Music-Worlds-Profil. Die Fehlerseite
 ist privat und enthält keine Rücksprungparameter. 27 Tests, Typprüfung,
 Lint und Build bestanden. Chromium bei 1440 px und WebKit bei 320 px
 prüften den simulierten Ausfall, das Layout und den Rückweg per Tastatur.
-Die Veröffentlichung nutzt den bestehenden Music-Worlds-Workflow.
+`71bf289` läuft als Worker `2c8f8dcc-03ed-4432-87ce-f665bf27330f`.
+Die [Produktionsprüfung](https://github.com/manuelk2607/Music-Worlds/actions/runs/45851673877)
+und die Prüfung der Profilübernahme auf der vorhandenen QA-Datenbank
+bestanden. Live führt ein Rücksprung ohne gültige Transaktion in DE/EN
+zum passenden Profil zurück. Den Ausfall des Anmeldedienstes haben wir
+lokal simuliert.
 
 ## Zentrale Anmeldung als Produktionsstandard – 25.11.2026
 
